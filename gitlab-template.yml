@@ -12,7 +12,6 @@ auto_ai_review:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TITLE !~ /\[no-ai\]/i
   before_script:
-    - git clean -fd
     - if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
     - source .venv/bin/activate
   script:
