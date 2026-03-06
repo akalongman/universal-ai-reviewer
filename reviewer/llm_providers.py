@@ -13,12 +13,13 @@ class AIProvider(ABC):
 
 
 class AnthropicReviewer(AIProvider):
-    def review(self, system_prompt, user_prompt, api_key):
+    def review(self, system_prompt, user_prompt, api_key, config):
         client = Anthropic(api_key=api_key)
         review_text = ""
         with client.messages.stream(
-                model="claude-opus-4-6", # claude-sonnet-4-6
-                max_tokens=8192,
+                model=config.model_name,
+                max_tokens=config.max_tokens,
+                temperature=config.temperature,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
         ) as stream:

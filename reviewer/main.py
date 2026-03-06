@@ -48,7 +48,7 @@ def main():
         ai_provider = get_provider(config.provider)
         api_key = config.gemini_api_key if config.provider == "gemini" else config.anthropic_api_key
 
-        review_text = ai_provider.review(system_prompt, user_prompt, api_key)
+        review_text = ai_provider.review(system_prompt, user_prompt, api_key, config)
 
         if not review_text:
             raise ValueError(f"{config.provider.capitalize()} returned an empty response.")

@@ -9,6 +9,14 @@ class Config:
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
         self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
 
+        if os.environ.get("AI_MODEL"):
+            self.model_name = os.environ.get("AI_MODEL")
+        else:
+            self.model_name = "claude-sonnet-4-6" if self.provider == "anthropic" else "gemini-2.5-pro"
+
+        self.max_tokens = int(os.environ.get("AI_MAX_TOKENS", "8192"))
+        self.temperature = float(os.environ.get("AI_TEMPERATURE", "0.2"))
+
         # 2. Auto-Detect the CI/CD Environment
         self.vcs_type = self._detect_vcs()
 

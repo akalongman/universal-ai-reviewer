@@ -12,15 +12,6 @@ auto_ai_review:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TITLE !~ /\[no-ai\]/i
   before_script:
-    - |
-      if [ -d ".venv" ]; then
-        source .venv/bin/activate
-        if ! python -c "from google import genai" &>/dev/null; then
-          echo "Detected corrupted google namespace. Rebuilding .venv..."
-          deactivate
-          rm -rf .venv
-        fi
-      fi
     - if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
     - source .venv/bin/activate
     - pip install --upgrade pip
@@ -30,8 +21,7 @@ auto_ai_review:
     - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
     - git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
     - pip uninstall -y google-generativeai google-genai
-    - pip install -force-reinstall -r _shared_tools/requirements.txt
-    - python -c "from google import genai; print('Google SDK Verified!')"
+    - pip install -r _shared_tools/requirements.txt
     - python _shared_tools/reviewer/main.py
 
   after_script:
