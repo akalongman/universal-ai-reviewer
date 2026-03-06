@@ -58,7 +58,12 @@ def main():
         )
 
         ai_provider = get_provider(config.provider)
-        api_key = config.gemini_api_key if config.provider == "gemini" else config.anthropic_api_key
+        if config.provider == "gemini":
+            api_key = config.gemini_api_key
+        elif config.provider == "openai":
+            api_key = config.openai_api_key
+        else:
+            api_key = config.anthropic_api_key
 
         review_text = ai_provider.review(system_prompt, user_prompt, api_key, config)
 

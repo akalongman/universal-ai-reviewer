@@ -41,6 +41,7 @@ runs:
         AI_PROVIDER: ${{ inputs.ai_provider }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         GITHUB_EVENT_PATH: ${{ github.event_path }}
         GITHUB_REPOSITORY: ${{ github.repository }}
       run: python ${{ github.action_path }}/reviewer/main.py

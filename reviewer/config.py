@@ -8,11 +8,18 @@ class Config:
         self.provider = os.environ.get("AI_PROVIDER", "anthropic").lower()
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
         self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self.openai_api_key = os.environ.get("OPENAI_API_KEY")
 
         if os.environ.get("AI_MODEL"):
             self.model_name = os.environ.get("AI_MODEL")
         else:
-            self.model_name = "claude-sonnet-4-6" if self.provider == "anthropic" else "gemini-2.5-pro"
+            if self.provider == "anthropic":
+                self.model_name = "claude-sonnet-4-6"
+            elif self.provider == "gemini":
+                self.model_name = "gemini-2.5-pro"
+            elif self.provider == "openai":
+                self.model_name = "gpt-4o"
+
 
         self.max_tokens = int(os.environ.get("AI_MAX_TOKENS", "8192"))
         self.temperature = float(os.environ.get("AI_TEMPERATURE", "0.2"))
@@ -66,6 +73,8 @@ class Config:
             missing.append("ANTHROPIC_API_KEY")
         elif self.provider == "gemini" and not self.gemini_api_key:
             missing.append("GEMINI_API_KEY")
+        elif self.provider == "openai" and not self.openai_api_key:
+            missing.append("OPENAI_API_KEY")
 
         # Validate Platform-Specific Variables
         if self.vcs_type == "gitlab":

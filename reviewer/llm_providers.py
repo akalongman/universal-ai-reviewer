@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 from anthropic import Anthropic
-
-# Import the new Google GenAI SDK
 from google import genai
 from google.genai import types
-
+from openai import OpenAI
 
 class AIProvider(ABC):
     @abstractmethod
@@ -53,7 +51,34 @@ class GeminiReviewer(AIProvider):
         return review_text
 
 
+class OpenAIReviewer(AIProvider):
+    def review(self, system_prompt, user_prompt, api_key, config):
+        client = OpenAI(api_key=api_key)
+        review_text = ""
+
+        response = client.chat.completions.create(
+            model=config.model_name,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            stream=True
+        )
+
+        for chunk in response:
+            # Safely extract the chunk content (Delta might be empty for first/last chunks)
+            if chunk.choices and chunk.choices[0].delta.content:
+                review_text += chunk.choices[0].delta.content
+
+        return review_text
+
+
 def get_provider(provider_name):
     if provider_name == "gemini":
         return GeminiReviewer()
+    elif provider_name == "openai":  # <-- New
+        return OpenAIReviewer()
+
     return AnthropicReviewer()
