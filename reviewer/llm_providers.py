@@ -17,7 +17,7 @@ class AnthropicReviewer(AIProvider):
         client = Anthropic(api_key=api_key)
         review_text = ""
         with client.messages.stream(
-                model="claude-3-5-sonnet-latest",
+                model="claude-opus-4-6", # claude-sonnet-4-6
                 max_tokens=8192,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
