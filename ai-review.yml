@@ -1,0 +1,27 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+auto_ai_review:
+  stage: review
+  cache:
+    key: "ai-review-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .cache/pip
+      - .venv/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TITLE !~ /\[no-ai\]/i
+  before_script:
+    - if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
+    - source .venv/bin/activate
+  script:
+    - echo "Fetching branch differences..."
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
+    - git clone -q https://oauth2:${GITLAB_TOKEN}@${CI_SERVER_HOST}/tsmu/ci-templates.git _shared_tools
+    - pip install -q -r _shared_tools/requirements.txt
+    - source .venv/bin/activate
+    - python _shared_tools/reviewer/main.py
+
+  after_script:
+    - echo "Cleaning up temporary files..."
+    - rm -rf _shared_tools mr_diff.txt
