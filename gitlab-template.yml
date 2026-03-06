@@ -21,7 +21,7 @@ auto_ai_review:
     - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
     - rm -rf _shared_tools
     - git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
-    - pip install -r _shared_tools/requirements.txt
+    - pip install -q -r _shared_tools/requirements.txt
     - python _shared_tools/reviewer/main.py
 
   after_script:

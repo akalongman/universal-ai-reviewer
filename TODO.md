@@ -9,7 +9,7 @@ This document outlines planned features and improvements to make this tool a tie
   - **Why:** OpenAI is the industry standard for many enterprise teams. Supporting it expands the potential user base significantly.
   - **Effort:** Low (Leverages existing Strategy pattern).
 
-- [ ] **Smart File Filtering (Ignore Noise)**
+- [x] **Smart File Filtering (Ignore Noise)**
   - **What:** Add an `.aiignore` file support or hardcoded filters to exclude noisy files (e.g., `package-lock.json`, `yarn.lock`, `*.svg`, `dist/`, `build/`) from the `git diff`.
   - **Why:** Saves API costs, speeds up the review, and prevents the AI from hallucinating issues in auto-generated files.
   - **Effort:** Low to Medium (Modifying the `git diff` generation step).
