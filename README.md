@@ -4,14 +4,16 @@ A platform-agnostic, multi-model AI code review assistant that plugs directly in
 
 Built with extensibility in mind, this tool uses the Strategy pattern to seamlessly support multiple version control systems (GitHub, GitLab) and leading AI models (Anthropic's Claude, Google's Gemini).
 
+---
+
 ## ✨ Key Features
 
-* **Platform Agnostic:** Runs natively on GitHub Actions, GitLab CI, and can easily be extended to Bitbucket or Jenkins.
-* **Multi-Model Support:** Switch between Claude (`claude-3-5-sonnet-latest`) and Gemini (`gemini-2.5-pro` / `gemini-1.5-pro-latest`) with a single environment variable.
-* **Context-Aware:** Reads the PR/MR Title, Description, and actual code diffs to understand the *why* behind the changes.
-* **Gatekeeper Mode:** Automatically fails the pipeline and blocks the merge if "🔴 Critical Issues" are detected.
-* **Clean UI Feedback:** Posts a real-time "⏳ Thinking..." indicator, and hides nitpicks inside collapsible Markdown blocks so your PR timeline stays clean.
-* **Custom Project Rules:** Enforce framework-specific standards (e.g., React hooks, Laravel Eloquent rules) via a simple `.ai-rules.md` file.
+* **Multi-VCS Support:** Native integration with **GitHub Actions** and **GitLab CI**.
+* **Multi-Model Support:** Choose between **Claude 3.5 Sonnet** (Anthropic) or **Gemini 2.5 Pro** (Google).
+* **Strategy Pattern Architecture:** Clean, modular Python codebase that is easy to extend.
+* **Gatekeeper Mode:** Automatically blocks merges if `🔴 Critical Issues` are detected.
+* **Collapsible Feedback:** Keeps the UI clean by hiding nitpicks inside `<details>` blocks.
+* **Custom Project Context:** Define project-specific rules via `.ai-rules.md`.
 
 ---
 
@@ -19,66 +21,31 @@ Built with extensibility in mind, this tool uses the Strategy pattern to seamles
 
 You don't need to install or host anything to use this tool. Just add the corresponding pipeline snippet to your project.
 
-### Option A: GitHub Actions
-Create a file at `.github/workflows/ai-review.yml` in your repository:
+### Option A: GitHub Actions (Recommended)
+You can use this tool as a native GitHub Action. No setup required. Add the following step to your `.github/workflows/ai-review.yml`:
 
 ```yaml
-name: AI Code Review
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
-          
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Generate Diff
-        run: git diff origin/${{ github.base_ref }}...HEAD > mr_diff.txt
-        
-      - name: Clone Universal AI Reviewer
-        run: git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
-        
-      - name: Install Dependencies
-        run: pip install -q -r _shared_tools/requirements.txt
-        
-      - name: Run Review
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # AI_PROVIDER: gemini  <-- Uncomment to use Gemini instead
-        run: python _shared_tools/reviewer/main.py
+- name: AI Code Review
+  uses: akalongman/universal-ai-reviewer@main
+  with:
+    ai_provider: 'anthropic' # or 'gemini'
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    # gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
 ```
 
 ### Option B: GitLab CI/CD
-Add this job to your `.gitlab-ci.yml` file:
+GitLab users can include this template directly from GitHub. No local files needed. Add this to your `.gitlab-ci.yml`:
 
 ```yaml
-ai_code_review:
-  stage: review
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  before_script:
-    - if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
-    - source .venv/bin/activate
-  script:
-    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
-    
-    # Fetch the open-source reviewer directly from GitHub
-    - git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
-    - pip install -q -r _shared_tools/requirements.txt
-    - python _shared_tools/reviewer/main.py
+include:
+  - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/main/gitlab-template.yml'
+
+# Ensure you have a 'review' stage defined
+stages:
+  - build
+  - test
+  - review
 ```
-*(Ensure `GITLAB_TOKEN` and your chosen AI API key are set in your GitLab CI/CD Variables).*
 
 ---
 
@@ -88,10 +55,10 @@ The script automatically detects whether it is running in GitHub or GitLab. You 
 
 | Variable | Required? | Description |
 | :--- | :--- | :--- |
-| `AI_PROVIDER` | Optional | Set to `gemini` to use Google's models. Defaults to `anthropic`. |
+| `AI_PROVIDER` | Optional | `anthropic` (default) or `gemini`. |
 | `ANTHROPIC_API_KEY` | Conditional | Required if using the default Anthropic provider. |
 | `GEMINI_API_KEY` | Conditional | Required if `AI_PROVIDER` is set to `gemini`. |
-| `GITHUB_TOKEN` | Conditional | Required for GitHub Actions (Auto-provided by `secrets.GITHUB_TOKEN`). |
+| `GITHUB_TOKEN` | Auto | Automatically handled by GitHub Actions. |
 | `GITLAB_TOKEN` | Conditional | Required for GitLab. Must be a PAT with `api` scope and Developer role. |
 
 ---
@@ -106,7 +73,29 @@ You can instruct the AI to enforce specific coding standards for your repository
 2. Never return raw models; use API Resources.
 3. Aggressively flag N+1 query problems in database calls.
 ```
-The AI will automatically inject these rules into its system prompt during the review.
+
+---
+
+## 🛠️ Local Development & Testing
+
+This project uses `pytest` for local validation without making real API calls.
+
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Run Test Suite**:
+   ```bash
+   python -m pytest tests/ -v
+   ```
+
+3. **Manual Run**:
+   ```bash
+   export VCS_PROVIDER="github" # or "gitlab"
+   export AI_PROVIDER="anthropic"
+   python reviewer/main.py
+   ```
 
 ---
 
@@ -117,14 +106,6 @@ We welcome contributions! Because this tool uses a modular Factory architecture,
 1. **New AI Models:** Add a new class to `reviewer/llm_providers.py` implementing the `AIProvider` interface.
 2. **New CI/CD Platforms:** Add a new class to `reviewer/vcs_providers.py` implementing the `VCSProvider` interface (e.g., `BitbucketProvider`).
 
-To run the test suite locally:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m pytest tests/ -v
-```
-
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -1,0 +1,42 @@
+# action.yml
+name: 'Universal AI Code Reviewer'
+description: 'AI-powered code review for PRs using Claude or Gemini'
+inputs:
+  anthropic_api_key:
+    description: 'Anthropic API Key (Required if using Claude)'
+    required: false
+  gemini_api_key:
+    description: 'Gemini API Key (Required if using Gemini)'
+    required: false
+  ai_provider:
+    description: 'The AI provider to use: anthropic or gemini'
+    default: 'anthropic'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Generate Diff
+      shell: bash
+      run: |
+        git fetch origin ${{ github.base_ref }}
+        git diff origin/${{ github.base_ref }}...HEAD > mr_diff.txt
+
+    - name: Install Dependencies
+      shell: bash
+      # github.action_path points to wherever GitHub downloaded your action
+      run: pip install -q -r ${{ github.action_path }}/requirements.txt
+
+    - name: Run AI Reviewer
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+      run: python ${{ github.action_path }}/reviewer/main.py
