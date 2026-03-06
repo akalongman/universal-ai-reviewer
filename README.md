@@ -74,7 +74,7 @@ ai_code_review:
     - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
     
     # Fetch the open-source reviewer directly from GitHub
-    - git clone -q https://github.com/your-username/universal-ai-reviewer.git _shared_tools
+    - git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
     - pip install -q -r _shared_tools/requirements.txt
     - python _shared_tools/reviewer/main.py
 ```
