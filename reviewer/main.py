@@ -14,6 +14,18 @@ def main():
         print(f"Configuration Error: {e}")
         sys.exit(1)
 
+    # --- ADD THIS DEBUG BLOCK ---
+    print("\n" + "=" * 35)
+    print("🔧 AI RUNTIME CONFIGURATION")
+    print("=" * 35)
+    print(f"VCS Platform   : {config.vcs_type.upper()}")
+    print(f"AI Provider    : {config.provider.upper()}")
+    print(f"AI Model       : {config.model_name}")
+    print(f"Max Tokens     : {config.max_tokens}")
+    print(f"Temperature    : {config.temperature}")
+    print("=" * 35 + "\n")
+
+
     # 2. Connect to the detected VCS (GitLab/GitHub)
     print(f"Connecting to {config.vcs_type.capitalize()}...")
     try:
