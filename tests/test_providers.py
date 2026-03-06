@@ -31,4 +31,4 @@ def test_anthropic_reviewer_stream_parsing(mock_anthropic_class):
     # Verify the Anthropic client was called with the correct model
     mock_client.messages.stream.assert_called_once()
     call_kwargs = mock_client.messages.stream.call_args.kwargs
-    assert call_kwargs['model'] == "claude-3-5-sonnet-latest"
+    assert call_kwargs['model'] == "claude-opus-4-6"
