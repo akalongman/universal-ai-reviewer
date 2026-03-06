@@ -46,7 +46,7 @@ def build_prompts(diff, mr_title, mr_description, custom_rules):
         3. IMPORTANT: Do not complain about missing imports or variables if they might be defined elsewhere in the file (you only see a diff).
         4. Provide code fixes using GitLab's suggestion syntax: ```suggestion ... ``` when possible.
         5. Provide strictly Markdown. No greetings or preambles.
-        6. If flawless, reply: "### 🤖 AI Code Review\n\nLooks good to me! 🚀 No issues found."
+        6. If flawless, reply: "### \nLooks good to me! 🚀 No issues found."
     """).strip()
 
     user_prompt = textwrap.dedent(f"""
