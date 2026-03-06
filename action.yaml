@@ -1,16 +1,17 @@
-# action.yml
 name: 'Universal AI Code Reviewer'
-description: 'AI-powered code review for PRs using Claude or Gemini'
+description: 'AI-powered code review for Pull Requests using Claude or Gemini'
+author: 'akalongman'
+
 inputs:
+  ai_provider:
+    description: 'The AI provider to use: anthropic or gemini'
+    required: false
+    default: 'anthropic'
   anthropic_api_key:
     description: 'Anthropic API Key (Required if using Claude)'
     required: false
   gemini_api_key:
     description: 'Gemini API Key (Required if using Gemini)'
-    required: false
-  ai_provider:
-    description: 'The AI provider to use: anthropic or gemini'
-    default: 'anthropic'
     required: false
 
 runs:
@@ -24,19 +25,22 @@ runs:
     - name: Generate Diff
       shell: bash
       run: |
-        git fetch origin ${{ github.base_ref }}
+        echo "Calculating diff for GitHub Pull Request..."
+        # In GitHub Actions, the 'base_ref' is the target branch (e.g., main)
+        git fetch origin ${{ github.base_ref }} --quiet
         git diff origin/${{ github.base_ref }}...HEAD > mr_diff.txt
 
     - name: Install Dependencies
       shell: bash
-      # github.action_path points to wherever GitHub downloaded your action
       run: pip install -q -r ${{ github.action_path }}/requirements.txt
 
     - name: Run AI Reviewer
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        AI_PROVIDER: ${{ inputs.ai_provider }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
-        AI_PROVIDER: ${{ inputs.ai_provider }}
+        GITHUB_EVENT_PATH: ${{ github.event_path }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
       run: python ${{ github.action_path }}/reviewer/main.py

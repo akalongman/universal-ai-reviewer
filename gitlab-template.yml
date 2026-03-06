@@ -1,4 +1,5 @@
 variables:
+  GIT_DEPTH: 0
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
 auto_ai_review:
@@ -14,12 +15,13 @@ auto_ai_review:
     - if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
     - source .venv/bin/activate
   script:
-    - echo "Fetching branch differences..."
-    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - echo "Calculating diff between $CI_MERGE_REQUEST_TARGET_BRANCH_NAME and HEAD..."
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME --quiet
     - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > mr_diff.txt
     - git clone -q https://github.com/akalongman/universal-ai-reviewer.git _shared_tools
     - pip install -q -r _shared_tools/requirements.txt
     - python _shared_tools/reviewer/main.py
 
   after_script:
+    - echo "Cleaning up..."
     - rm -rf _shared_tools mr_diff.txt
