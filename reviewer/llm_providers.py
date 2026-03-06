@@ -8,7 +8,7 @@ from google.genai import types
 
 class AIProvider(ABC):
     @abstractmethod
-    def review(self, system_prompt, user_prompt, api_key):
+    def review(self, system_prompt, user_prompt, api_key, config):
         pass
 
 
@@ -29,21 +29,23 @@ class AnthropicReviewer(AIProvider):
 
 
 class GeminiReviewer(AIProvider):
-    def review(self, system_prompt, user_prompt, api_key):
+    def review(self, system_prompt, user_prompt, api_key, config):
         # Initialize the new Client
         client = genai.Client(api_key=api_key)
 
         # System instructions are now passed via a Config object
-        config = types.GenerateContentConfig(
+        gemini_config = types.GenerateContentConfig(
             system_instruction=system_prompt,
+            max_output_tokens=config.max_tokens,
+            temperature=config.temperature,
         )
 
         review_text = ""
         # Using the generate_content_stream method
         response = client.models.generate_content_stream(
-            model='gemini-2.5-pro',
+            model=config.model_name,
             contents=user_prompt,
-            config=config
+            config=gemini_config
         )
         for chunk in response:
             if chunk.text:
