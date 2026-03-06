@@ -8,7 +8,7 @@ auto_ai_review:
     key: "ai-review-$CI_COMMIT_REF_SLUG"
     paths:
       - .cache/pip
-      - .venv/
+      #- .venv/
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TITLE !~ /\[no-ai\]/i
   before_script:

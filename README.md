@@ -9,7 +9,8 @@ Built with extensibility in mind, this tool uses the Strategy pattern to seamles
 ## ✨ Key Features
 
 * **Multi-VCS Support:** Native integration with **GitHub Actions** and **GitLab CI**.
-* **Multi-Model Support:** Choose between **Claude 3.5 Sonnet** (Anthropic) or **Gemini 2.5 Pro** (Google).
+* **Multi-Model Support:** Choose between **Claude 3.5 Sonnet** (Anthropic) or **Gemini 2.0 Flash/Pro** (Google).
+* **Highly Configurable:** Fine-tune the review by choosing specific models, setting token limits, and adjusting the AI temperature.
 * **Strategy Pattern Architecture:** Clean, modular Python codebase that is easy to extend.
 * **Gatekeeper Mode:** Automatically blocks merges if `🔴 Critical Issues` are detected.
 * **Collapsible Feedback:** Keeps the UI clean by hiding nitpicks inside `<details>` blocks.
@@ -22,7 +23,7 @@ Built with extensibility in mind, this tool uses the Strategy pattern to seamles
 You don't need to install or host anything to use this tool. Just add the corresponding pipeline snippet to your project.
 
 ### Option A: GitHub Actions (Recommended)
-You can use this tool as a native GitHub Action. No setup required. Add the following step to your `.github/workflows/ai-review.yml`:
+You can use this tool as a native GitHub Action. Ensure you set `fetch-depth: 0` to allow the tool to calculate the diff. Add the following to your `.github/workflows/ai-review.yml`:
 
 ```yaml
 - name: AI Code Review
@@ -31,10 +32,14 @@ You can use this tool as a native GitHub Action. No setup required. Add the foll
     ai_provider: 'anthropic' # or 'gemini'
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     # gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+  env:
+    # Optional Tuning
+    AI_MODEL: 'claude-3-5-sonnet-latest' 
+    AI_TEMPERATURE: '0.2'
 ```
 
 ### Option B: GitLab CI/CD
-GitLab users can include this template directly from GitHub. No local files needed. Add this to your `.gitlab-ci.yml`:
+GitLab users can include this template directly from GitHub. The template automatically handles the `GIT_DEPTH: 0` requirement. Add this to your `.gitlab-ci.yml`:
 
 ```yaml
 include:
@@ -51,15 +56,18 @@ stages:
 
 ## ⚙️ Configuration Variables
 
-The script automatically detects whether it is running in GitHub or GitLab. You only need to provide the necessary API keys as environment variables:
+The script automatically detects whether it is running in GitHub or GitLab. You can tune the behavior using the following environment variables:
 
-| Variable | Required? | Description |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `AI_PROVIDER` | Optional | `anthropic` (default) or `gemini`. |
-| `ANTHROPIC_API_KEY` | Conditional | Required if using the default Anthropic provider. |
-| `GEMINI_API_KEY` | Conditional | Required if `AI_PROVIDER` is set to `gemini`. |
+| `AI_PROVIDER` | `anthropic` | Set to `gemini` to use Google's models. |
+| `AI_MODEL` | Provider Dependent | Defaults to `claude-3-5-sonnet-latest` or `gemini-2.0-flash`. |
+| `AI_MAX_TOKENS` | `4096` | The maximum length of the AI response. |
+| `AI_TEMPERATURE` | `0.2` | Controls randomness (0.0 is strict, 1.0 is creative). |
+| `ANTHROPIC_API_KEY` | - | Required if using the Anthropic provider. |
+| `GEMINI_API_KEY` | - | Required if `AI_PROVIDER` is set to `gemini`. |
+| `GITLAB_TOKEN` | - | Required for GitLab (PAT with `api` scope). |
 | `GITHUB_TOKEN` | Auto | Automatically handled by GitHub Actions. |
-| `GITLAB_TOKEN` | Conditional | Required for GitLab. Must be a PAT with `api` scope and Developer role. |
 
 ---
 
@@ -104,7 +112,7 @@ This project uses `pytest` for local validation without making real API calls.
 We welcome contributions! Because this tool uses a modular Factory architecture, it is incredibly easy to add support for new platforms or LLMs.
 
 1. **New AI Models:** Add a new class to `reviewer/llm_providers.py` implementing the `AIProvider` interface.
-2. **New CI/CD Platforms:** Add a new class to `reviewer/vcs_providers.py` implementing the `VCSProvider` interface (e.g., `BitbucketProvider`).
+2. **New CI/CD Platforms:** Add a new class to `reviewer/vcs_providers.py` implementing the `VCSProvider` interface.
 
 ## 📄 License
 
