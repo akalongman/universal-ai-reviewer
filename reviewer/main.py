@@ -1,4 +1,5 @@
 import sys
+import re
 from config import Config
 from vcs_providers import get_vcs_provider
 from prompts import get_code_diff, get_custom_rules, build_prompts
@@ -39,7 +40,7 @@ def main():
     diff = get_code_diff()
     custom_rules = get_custom_rules()
 
-    # 4. Create Real-Time UI Indicator
+    # 4. Create a Real-Time UI Indicator
     thinking_note = None
     try:
         print(f"Creating placeholder comment for {config.provider.capitalize()}...")
@@ -87,13 +88,18 @@ def main():
         sys.exit(1)
 
     # 7. Status Gatekeeper
-    if "🔴 Critical Issues" in review_text:
+    # Check if the header exists
+    has_critical_header = "🔴 Critical Issues" in review_text
+
+    # This regex looks for the header followed by optional spaces/colons/newlines, then "none", "no", "0", or "n/a"
+    is_false_alarm = bool(re.search(r'🔴 Critical Issues\s*[:\n]*\s*(none|no|0|n/a)\b', review_text, re.IGNORECASE))
+
+    if has_critical_header and not is_false_alarm:
         print("\n[!] CRITICAL ISSUES DETECTED. Marking job as FAILED.")
         sys.exit(1)
     else:
         print("\n[✓] No critical issues found. Marking job as PASSED.")
         sys.exit(0)
-
 
 if __name__ == "__main__":
     main()

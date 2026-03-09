@@ -106,12 +106,13 @@ def build_prompts(diff, mr_title, mr_description, custom_rules):
 
         Guidelines:
         1. Categorize feedback into: 🔴 Critical Issues, 🟡 Suggestions, and 🟢 Nitpicks/Praise.
+            **CRITICAL INSTRUCTION:** If there are no critical issues, you MUST COMPLETELY OMIT the "🔴 Critical Issues" header. Do not write "None" or "N/A".
         2. CLEANLINESS RULE: You MUST wrap all "🟢 Nitpicks/Praise" inside a Markdown collapsible block:
            <details><summary><b>🟢 Nitpicks & Praise</b></summary>
            (Your nitpicks here)
            </details>
         3. IMPORTANT: Do not complain about missing imports or variables if they might be defined elsewhere in the file (you only see a diff).
-        4. Provide code fixes using GitLab's suggestion syntax: ```suggestion ... ``` when possible.
+        4. Provide code fixes using GitLab/GitHub suggestion syntax: ```suggestion ... ``` when possible.
         5. Provide strictly Markdown. No greetings or preambles.
         6. If flawless, reply: "### \nLooks good to me! 🚀 No issues found."
     """).strip()

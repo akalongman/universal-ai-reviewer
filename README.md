@@ -45,7 +45,7 @@ GitLab users can include this template directly from GitHub. The template automa
 
 ```yaml
 include:
-  - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/main/gitlab-template.yml'
+  - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/1.0.0/gitlab-template.yml'
 
 # Ensure you have a 'review' stage defined
 stages:
@@ -96,6 +96,11 @@ package-lock.json
 public/build/*
 dist/*
 *.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
 ```
 
 ---
