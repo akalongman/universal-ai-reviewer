@@ -56,6 +56,31 @@ stages:
 
 ---
 
+## 🚦 Allowing Merges on AI Failure (Soft Fails)
+
+By default, this tool acts as a strict gatekeeper: if it detects `🔴 Critical Issues`, it will fail the CI job and block the Merge/Pull Request. 
+
+If you want the AI to only act as an advisor (failing the job with a warning, but still allowing developers to merge their code), you should use your platform's native "Soft Fail" flags:
+
+**For GitHub Actions:**
+Add `continue-on-error: true` to the step in your workflow:
+```yaml
+- name: AI Code Review
+  uses: akalongman/universal-ai-reviewer@main
+  continue-on-error: true # <--- Allows merging even if critical issues are found
+  with:
+    # ...
+```
+
+**For GitLab CI:**
+Override the included job to allow failures in your `.gitlab-ci.yml`:
+```yaml
+auto_ai_review:
+  allow_failure: true # <--- Job turns orange instead of red, allowing merges
+```
+
+---
+
 ## ⚙️ Configuration Variables
 
 The script automatically detects whether it is running in GitHub or GitLab. You can tune the behavior using the following environment variables:
