@@ -67,7 +67,10 @@ index 1234567..890abcd 100644
     assert "axios" not in filtered
 
 
-def test_get_ignore_patterns_loads_defaults():
+def test_get_ignore_patterns_empty_by_default():
+    # Act: Try to load a file that doesn't exist
     patterns = get_ignore_patterns("non_existent_file.aiignore")
-    assert "*.lock" in patterns
-    assert "*.svg" in patterns
+
+    # Assert: It should return a completely empty list, not defaults
+    assert patterns == []
+    assert len(patterns) == 0

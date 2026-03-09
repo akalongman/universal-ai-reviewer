@@ -87,12 +87,15 @@ You can instruct the AI to enforce specific coding standards for your repository
 ```
 
 ### Ignore Noisy Files (`.aiignore`)
-By default, the tool ignores lockfiles, compiled assets, and SVGs. To add your own ignored files or directories, create an `.aiignore` file:
+By default, the AI will review **all** files in the Pull/Merge Request. To save tokens and prevent the AI from reviewing auto-generated files (like lockfiles or compiled assets), create an `.aiignore` file in the root of your repository:
 
 ```text
-docs/*
-migrations/*.py
-test/fixtures/*.json
+# .aiignore example
+*.lock
+package-lock.json
+public/build/*
+dist/*
+*.svg
 ```
 
 ---

@@ -4,14 +4,10 @@ import textwrap
 import re
 import fnmatch
 
+
 def get_ignore_patterns(file_path=".aiignore"):
-    """Returns a list of patterns to ignore, combining defaults with a local .aiignore file."""
-    # Sane defaults for noisy, auto-generated, or binary files
-    patterns = [
-        "*.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-        "*.svg", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.ico",
-        "*.min.js", "*.min.css", "dist/*", "build/*", "coverage/*"
-    ]
+    """Returns a list of patterns to ignore from a local .aiignore file."""
+    patterns = []
 
     if os.path.exists(file_path):
         print(f"Found {file_path}! Loading custom ignore patterns...")
@@ -23,10 +19,12 @@ def get_ignore_patterns(file_path=".aiignore"):
         except Exception as e:
             print(f"Warning: Could not read {file_path}: {e}")
 
-    print(f"Active Ignore Patterns: {', '.join(patterns)}")
+    if patterns:
+        print(f"Active Ignore Patterns: {', '.join(patterns)}")
+    else:
+        print("No active ignore patterns (.aiignore not found or empty). Reviewing all changed files.")
 
     return patterns
-
 
 def filter_diff(diff_text, ignore_patterns):
     """Parses a unified git diff and removes file chunks that match the ignore patterns."""
