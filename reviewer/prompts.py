@@ -3,7 +3,7 @@ import sys
 import textwrap
 import re
 import fnmatch
-
+from datetime import datetime
 
 def get_ignore_patterns(file_path=".aiignore"):
     """Returns a list of patterns to ignore from a local .aiignore file."""
@@ -100,9 +100,14 @@ def build_prompts(diff, mr_title, mr_description, custom_rules):
 
     rules_injection = f"\n**Specific Project Rules:**\n{custom_rules}\n" if custom_rules else ""
 
-    system_context = textwrap.dedent("""
+    # Get today's actual date
+    current_date = datetime.now().strftime("%B %d, %Y")
+
+    system_context = textwrap.dedent(f"""
         You are an expert, rigorous Principal Software Engineer.
         Review the Merge Request for bugs, security, and performance.
+
+        CRITICAL CONTEXT: Today's date is {current_date}. Do not flag timestamps, migration files, or copyright notices as "future dates" if they match the current year.
 
         Guidelines:
         1. Categorize feedback into: 🔴 Critical Issues, 🟡 Suggestions, and 🟢 Nitpicks/Praise.
