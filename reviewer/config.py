@@ -22,7 +22,9 @@ class Config:
 
 
         self.max_tokens = int(os.environ.get("AI_MAX_TOKENS", "8192"))
-        self.temperature = float(os.environ.get("AI_TEMPERATURE", "0.2"))
+
+        temperature_env = os.environ.get("AI_TEMPERATURE")
+        self.temperature = float(temperature_env) if temperature_env else None
 
         # 2. Auto-Detect the CI/CD Environment
         self.vcs_type = self._detect_vcs()

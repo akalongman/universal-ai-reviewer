@@ -90,12 +90,22 @@ The script automatically detects whether it is running in GitHub or GitLab. You 
 | `AI_PROVIDER` | `anthropic` | Set to `openai` or `gemini` to use other models. |
 | `AI_MODEL` | Provider Dependent | Defaults to `claude-3-5-sonnet-latest`, `gemini-2.0-flash`, or `gpt-4o`. |
 | `AI_MAX_TOKENS` | `8192` | The maximum length of the AI response. |
-| `AI_TEMPERATURE` | `0.2` | Controls randomness (0.0 is strict, 1.0 is creative). |
+| `AI_TEMPERATURE` | *(unset)* | Controls randomness (0.0 is strict, 1.0 is creative). If left unset, the parameter is omitted from the request entirely so the provider's own default applies. See the note below before setting this. |
 | `ANTHROPIC_API_KEY` | - | Required if using the Anthropic provider. |
 | `GEMINI_API_KEY` | - | Required if `AI_PROVIDER` is set to `gemini`. |
 | `OPENAI_API_KEY` | - | Required if `AI_PROVIDER` is set to `openai`. |
 | `GITLAB_TOKEN` | - | Required for GitLab (PAT with `api` scope). |
 | `GITHUB_TOKEN` | Auto | Automatically handled by GitHub Actions. |
+
+### A note on `AI_TEMPERATURE`
+
+Leaving `AI_TEMPERATURE` unset is the safest default for cross-provider use. When the variable is absent, the reviewer omits the parameter from the API request and lets each provider apply its own default (typically 1.0). This matters because several current models reject or constrain the `temperature` field:
+
+* **OpenAI reasoning models** (the `o1`, `o3`, `o4`, and some `gpt-5` variants) reject any `temperature` value and return a 400 error if one is supplied.
+* **Anthropic Claude with extended thinking enabled** requires `temperature` to be exactly `1.0`. Any other value is rejected by the API.
+* **Google Gemini thinking configurations** accept the parameter but it has little effect in thinking mode.
+
+Set `AI_TEMPERATURE` explicitly only when you have picked a specific model and you know that value is supported.
 
 ---
 

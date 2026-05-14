@@ -23,7 +23,7 @@ def main():
     print(f"AI Provider    : {config.provider.upper()}")
     print(f"AI Model       : {config.model_name}")
     print(f"Max Tokens     : {config.max_tokens}")
-    print(f"Temperature    : {config.temperature}")
+    print(f"Temperature    : {config.temperature if config.temperature is not None else '(provider default)'}")
     print("=" * 35 + "\n")
 
 
