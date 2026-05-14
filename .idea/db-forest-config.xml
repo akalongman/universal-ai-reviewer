@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="db-forest-configuration">
+    <data version="2">.
+	1:0:2f7bd3c7-04a1-416e-ab2b-7a18f16d85fb:Local
+	6:0:777dba40-1b47-44d0-8d46-e5baa658f9a2:ISU
+	12:0:9cfade6d-75d2-4dd1-aa30-53f722ecbbd2:LongServer
+	----------------------------------------
+	2:1:c8164513-ba2f-42fa-b2a8-d95b799d1aa4
+	3:1:0ba13a8e-f491-4898-9061-c8bcec18a078
+	4:1:8386cc29-9efe-4996-b7f4-cebe4f2fbdbb
+	5:1:92c2091e-c8c7-49c2-a3df-7c2970568c74
+	7:6:36e183aa-1f1d-48fa-a77b-9a6b26966f94
+	8:6:eed82cbc-4c10-4c10-9e4b-e14a7cfff377
+	9:6:2a09a923-887b-4053-9dda-2ad7406ebeba
+	10:6:4f11dbd6-ca2e-4bf8-8c3f-a6909df59e7f
+	11:6:678150ce-0e36-4db7-a363-f2c168417081
+	13:12:14b9d1a2-8fd5-4f40-a992-a5d743fb604b
+	14:12:23e9164c-4232-40ff-8257-bdb0a2723972
+	15:12:086ce475-53ed-4354-a8d0-51e715e1e924
+	16:12:cd2361c2-e87e-4be5-bb21-b19dc382323f
+		.</data>
+  </component>
+</project>
