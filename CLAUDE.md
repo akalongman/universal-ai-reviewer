@@ -11,6 +11,14 @@ A CI/CD bot that posts an AI generated code review comment on a Pull Request (Gi
 
 There is no library API, no `setup.py`, no `pyproject.toml`. The entrypoint is `reviewer/main.py`.
 
+## Spec-driven development
+
+This project uses OpenSpec for non-trivial changes. This file (CLAUDE.md) is the project constitution, the source of truth for tech stack, architecture, and conventions. The capability map and OpenSpec-native conventions live in `openspec/config.yaml`.
+
+Workflow: `/opsx:propose` → `/opsx:apply` → `/opsx:archive`. For exploratory thinking without committing to a change, use `/opsx:explore`.
+
+When inline rule detail in this file grows past about five lines on a topic, that is the signal to extract it into a born-populated capability spec under `openspec/specs/<capability>/spec.md` via the propose / apply / archive cycle, and replace the inline block with a row in a capability-spec table. Until then, the inline sections below stay as the source of truth.
+
 ## Commands
 
 All commands run from the repo root.

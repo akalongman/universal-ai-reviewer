@@ -1,0 +1,79 @@
+schema: spec-driven
+
+context: |
+  # Constitution
+  The project constitution is CLAUDE.md. Treat it as the source of truth
+  for tech stack, architecture, conventions, and commands. Do not
+  re-derive or contradict the constitution inside `openspec/` files.
+
+  # Project summary
+  Universal AI Reviewer is a CI/CD bot that posts an AI generated code
+  review comment on a Pull Request (GitHub) or Merge Request (GitLab).
+  It is consumed in two ways: as a GitHub composite action
+  (`action.yaml`) referenced via `uses: akalongman/universal-ai-reviewer@<ref>`,
+  or as a GitLab CI template (`gitlab-template.yml`) included from a
+  downstream `.gitlab-ci.yml`. The entrypoint is `reviewer/main.py`,
+  which runs a fixed seven step pipeline and uses process exit codes as
+  its only output channel to CI. Two pluggable axes (VCS host, AI
+  provider) are wired via parallel Strategy + Factory patterns.
+
+  # Capability map
+  ## Core pipeline
+  - pipeline-orchestration: the seven step run in `reviewer/main.py`
+    plus the exit code gatekeeper that fails CI when a real
+    "🔴 Critical Issues" header is present in the AI response.
+  - configuration: env var loading, VCS auto detection
+    (`GITLAB_CI` / `GITHUB_ACTIONS`), default model selection, and the
+    optional `AI_TEMPERATURE` opt in behaviour (in `reviewer/config.py`).
+
+  ## Integrations
+  - vcs-integration: abstract `VCSProvider` plus `GitLabProvider` and
+    `GitHubProvider`, including the placeholder comment then edit
+    lifecycle that gives reviewers live "thinking" feedback.
+  - llm-integration: abstract `AIProvider` plus `AnthropicReviewer`,
+    `GeminiReviewer`, `OpenAIReviewer`. All three stream tokens and
+    concatenate them into a single markdown blob.
+  - ci-runners: `action.yaml` (GitHub composite action) and
+    `gitlab-template.yml` (GitLab CI template). Owns the `mr_diff.txt`
+    generation step and the template re-clone semantics.
+
+  ## Review behaviour
+  - prompt-engineering: system and user prompt construction, including
+    `.ai-rules.md` injection, current date injection, and the category
+    header contract (`🔴 Critical Issues`, `🟡 Suggestions`,
+    `🟢 Nitpicks/Praise`) that the gatekeeper reads.
+  - diff-handling: reading `mr_diff.txt` from the working directory,
+    `.aiignore` fnmatch filtering, and the `MAX_DIFF_SIZE = 50000`
+    truncation in `build_prompts`.
+
+  # OpenSpec workflow conventions
+  - The gatekeeper contract is split across `prompt-engineering` (which
+    instructs the model to OMIT the critical header when no critical
+    issues exist) and `pipeline-orchestration` (which greps for that
+    header). Any proposal that renames a category, changes the
+    OMIT-when-empty rule, or changes the exit code policy MUST update
+    both capabilities in the same change.
+  - Proposals touching `llm-integration` MUST include at least one
+    scenario describing how stream chunks are consumed, matching the
+    pattern in `tests/test_providers.py` (mocked chunk list, no real
+    network). The streaming contract is "concatenate chunks into a
+    single markdown blob" and must be preserved.
+  - Proposals touching `ci-runners` MUST call out version pinning
+    consequences in the impact section: the GitLab template re-clones
+    this repo at job time from `main` into `_shared_tools/`, so a
+    consumer that pins a tag of the *template* still gets the cloned
+    code from `main` unless they also pin the clone ref.
+  - Scenarios SHALL be testable against `pytest`. Tests run from the
+    repo root because of the import asymmetry described in CLAUDE.md
+    ("Import layout gotcha").
+
+rules:
+  proposal:
+    - State which capability the change belongs to. New capabilities
+      MUST be justified against the capability map above.
+    - Call out any cross capability contract the change touches. The
+      most common one is the category header contract between
+      `prompt-engineering` and `pipeline-orchestration`.
+  tasks:
+    - Each task SHALL be verifiable by `python -m pytest tests/ -v`
+      from the repo root.
