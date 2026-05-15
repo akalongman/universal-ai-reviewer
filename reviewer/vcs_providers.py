@@ -1,11 +1,15 @@
 import os
 import sys
 import json
+import base64
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class VCSProvider(ABC):
     """Abstract Base Class defining the standard operations for any Code Hosting Platform."""
+
+    head_sha: Optional[str] = None
 
     @abstractmethod
     def get_mr_details(self) -> dict:
@@ -13,13 +17,18 @@ class VCSProvider(ABC):
         pass
 
     @abstractmethod
-    def create_placeholder_comment(self, ai_provider_name: str):
+    def create_placeholder_comment(self, ai_provider_name: str, extra: str = ""):
         """Creates a 'Thinking...' comment and returns the comment object."""
         pass
 
     @abstractmethod
     def update_or_create_comment(self, note, review_text: str, ai_provider_name: str):
         """Updates the placeholder comment with the final review, or creates a new one."""
+        pass
+
+    @abstractmethod
+    def get_file_content(self, path: str, ref: str) -> Optional[str]:
+        """Return the file's text at `ref`, or None if it does not exist there."""
         pass
 
 
@@ -31,6 +40,7 @@ class GitLabProvider(VCSProvider):
         self.gl = gitlab.Gitlab(url=url, private_token=token)
         self.project = self.gl.projects.get(project_id)
         self.mr = self.project.mergerequests.get(mr_iid)
+        self.head_sha = self.mr.sha
 
     def get_mr_details(self):
         return {
@@ -38,8 +48,10 @@ class GitLabProvider(VCSProvider):
             "description": self.mr.description or "No description provided."
         }
 
-    def create_placeholder_comment(self, ai_provider_name):
+    def create_placeholder_comment(self, ai_provider_name, extra=""):
         body = f"⏳ **{ai_provider_name.capitalize()} is reviewing your code...**\n*(This usually takes 10-20 seconds)*"
+        if extra:
+            body += f"\n*{extra}*"
         return self.mr.notes.create({'body': body})
 
     def update_or_create_comment(self, note, review_text, ai_provider_name):
@@ -49,6 +61,22 @@ class GitLabProvider(VCSProvider):
             note.save()
         else:
             self.mr.notes.create({'body': final_body})
+
+    def get_file_content(self, path: str, ref: str) -> Optional[str]:
+        from gitlab.exceptions import GitlabGetError
+        try:
+            file_obj = self.project.files.get(file_path=path, ref=ref)
+        except GitlabGetError as exc:
+            if getattr(exc, "response_code", None) == 404:
+                return None
+            raise
+        raw = file_obj.decode()
+        if isinstance(raw, bytes):
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+        return raw
 
 
 # --- GITHUB IMPLEMENTATION ---
@@ -69,6 +97,7 @@ class GitHubProvider(VCSProvider):
             sys.exit(1)
 
         self.pr = self.repo.get_pull(self.pr_number)
+        self.head_sha = self.pr.head.sha
         # In GitHub's API, Pull Request comments are treated as Issue comments
         self.issue = self.repo.get_issue(self.pr_number)
 
@@ -78,8 +107,10 @@ class GitHubProvider(VCSProvider):
             "description": self.pr.body or "No description provided."
         }
 
-    def create_placeholder_comment(self, ai_provider_name):
+    def create_placeholder_comment(self, ai_provider_name, extra=""):
         body = f"⏳ **{ai_provider_name.capitalize()} is reviewing your code...**\n*(This usually takes 10-20 seconds)*"
+        if extra:
+            body += f"\n*{extra}*"
         return self.issue.create_comment(body)
 
     def update_or_create_comment(self, note, review_text, ai_provider_name):
@@ -88,6 +119,22 @@ class GitHubProvider(VCSProvider):
             note.edit(final_body)
         else:
             self.issue.create_comment(final_body)
+
+    def get_file_content(self, path: str, ref: str) -> Optional[str]:
+        from github import UnknownObjectException
+        try:
+            content_file = self.repo.get_contents(path, ref=ref)
+        except UnknownObjectException:
+            return None
+        if isinstance(content_file, list):
+            return None
+        raw = content_file.decoded_content
+        if isinstance(raw, bytes):
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+        return raw
 
 
 # --- FACTORY FUNCTION ---

@@ -19,6 +19,14 @@ Workflow: `/opsx:propose` → `/opsx:apply` → `/opsx:archive`. For exploratory
 
 When inline rule detail in this file grows past about five lines on a topic, that is the signal to extract it into a born-populated capability spec under `openspec/specs/<capability>/spec.md` via the propose / apply / archive cycle, and replace the inline block with a row in a capability-spec table. Until then, the inline sections below stay as the source of truth.
 
+### Capability specs (Progressive Disclosure)
+
+For canonical detail, read the cited capability spec under `openspec/specs/<name>/spec.md`. Rules below are summaries; the spec is the source of truth.
+
+| Topic | Spec | Rule summary |
+|---|---|---|
+| Full file context fetching | `context-fetching` | Opt in via `AI_FETCH_CHANGED_FULL` / `AI_FETCH_RELATED_FILES` / `AI_FETCH_RELATED_DEPTH`. Tree-sitter import extraction for JS, TS, and PHP only; other languages still get full content of changed files but skip related resolution. Repo-root `tsconfig.json` and `composer.json` only. Overflow fails loudly, no silent truncation. |
+
 ## Commands
 
 All commands run from the repo root.

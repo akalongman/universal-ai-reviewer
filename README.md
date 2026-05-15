@@ -96,6 +96,9 @@ The script automatically detects whether it is running in GitHub or GitLab. You 
 | `OPENAI_API_KEY` | - | Required if `AI_PROVIDER` is set to `openai`. |
 | `GITLAB_TOKEN` | - | Required for GitLab (PAT with `api` scope). |
 | `GITHUB_TOKEN` | Auto | Automatically handled by GitHub Actions. |
+| `AI_FETCH_CHANGED_FULL` | `false` | When `true`, the reviewer fetches the full head content of each changed file alongside the diff. See "Full file context (preview)" below. |
+| `AI_FETCH_RELATED_FILES` | `false` | When `true`, the reviewer also fetches files imported by changed files (JS, TS, PHP in v1). See "Full file context (preview)" below. |
+| `AI_FETCH_RELATED_DEPTH` | `1` | Maximum number of import hops to follow when `AI_FETCH_RELATED_FILES=true`. `0` disables related fetching entirely. |
 
 ### A note on `AI_TEMPERATURE`
 
@@ -106,6 +109,27 @@ Leaving `AI_TEMPERATURE` unset is the safest default for cross-provider use. Whe
 * **Google Gemini thinking configurations** accept the parameter but it has little effect in thinking mode.
 
 Set `AI_TEMPERATURE` explicitly only when you have picked a specific model and you know that value is supported.
+
+### Full file context (preview)
+
+By default the reviewer sees only the unified diff, which can cause the model to flag "missing imports" or "undefined functions" that actually exist elsewhere in the file. To give the AI broader context, opt in with the following variables (off by default):
+
+* `AI_FETCH_CHANGED_FULL=true` fetches the head version of every changed file and embeds it in the prompt under a `**Full File Context:**` section.
+* `AI_FETCH_RELATED_FILES=true` additionally extracts imports from each changed file and fetches the resolved files. JavaScript, TypeScript, and PHP are supported in v1 (other languages still benefit from `AI_FETCH_CHANGED_FULL`, they simply skip import extraction).
+* `AI_FETCH_RELATED_DEPTH=N` controls how many hops to follow. `0` disables, `1` (default) fetches only direct imports, higher values traverse transitively.
+
+Resolution rules:
+
+* **JavaScript / TypeScript**: relative imports are resolved against the source file. The reviewer reads `tsconfig.json` (honoring `compilerOptions.paths` aliases) and `package.json` (top level `imports`) at the repository root. The standard Node resolution suffixes (`.ts`, `.tsx`, `.js`, `.jsx`, `index.*`) are tried in order. Webpack, vite, and rollup specific aliases are not honored in v1.
+* **PHP**: namespaces are resolved against `composer.json` `autoload.psr-4` and `autoload-dev.psr-4` mappings at the repository root. `classmap` and `files` are not supported in v1.
+
+Limitations and failure modes:
+
+* Configuration files are read from the repository root only. Monorepos with multiple `tsconfig.json` or `composer.json` files are not fully supported in v1.
+* Unresolved import specifiers are silently skipped rather than logged as errors.
+* If the assembled prompt would exceed the active model's context window (with a 20 percent safety margin), the job fails with a message asking you to disable the feature, lower the depth, or shrink the PR. The reviewer does not silently truncate fetched content.
+
+Cost trade off: enabling these variables substantially increases input tokens (and therefore cost and latency). The feature is most valuable for small to medium PRs where the model would otherwise hallucinate from missing context.
 
 ---
 

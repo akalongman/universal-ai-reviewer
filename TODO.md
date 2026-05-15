@@ -9,10 +9,9 @@ This document outlines planned features and improvements to make this tool a tie
   - **Why:** Provides a vastly superior User Experience (UX), matching how human developers conduct code reviews.
   - **Effort:** High (Requires complex API interactions and accurate line-number mapping from the diff).
 
-- [ ] **Full-File Context (Prevent Hallucinations)**
-  - **What:** For small diffs (e.g., < 5 files), fetch the *full contents* of the edited files via the VCS API and provide them as read-only context to the AI alongside the diff.
-  - **Why:** Drastically reduces "false positives" by allowing the AI to see how new code interacts with the rest of the file (e.g., seeing where a function is defined).
-  - **Effort:** Medium.
+- [x] **Full-File Context (Prevent Hallucinations)**
+  - **What:** Opt in via `AI_FETCH_CHANGED_FULL=true`. Goes beyond the original scope: also fetches imported files (JS, TS, PHP in v1) via `AI_FETCH_RELATED_FILES=true` plus `AI_FETCH_RELATED_DEPTH=N` for traversal control. Tree-sitter based import extraction, `tsconfig.json` / `composer.json` aware path resolution, context window overflow fails loudly with an actionable message.
+  - **Status:** Shipped. Canonical spec: `openspec/specs/context-fetching/spec.md`. Archived change: `openspec/changes/archive/2026-05-14-add-full-file-context/`.
 
 - [ ] **Support Local / Private Models (Ollama)**
   - **What:** Add a `LocalProvider` that connects to a local instance like `localhost:11434` using the standard OpenAI SDK format.

@@ -93,12 +93,25 @@ def get_custom_rules(file_path=".ai-rules.md"):
     return os.environ.get("AI_PROJECT_CONTEXT", "").strip()
 
 
-def build_prompts(diff, mr_title, mr_description, custom_rules):
+def build_prompts(diff, mr_title, mr_description, custom_rules, fetched_files=None):
     MAX_DIFF_SIZE = 50000
     if len(diff) > MAX_DIFF_SIZE:
         diff = diff[:MAX_DIFF_SIZE] + "\n\n... [truncated for token limits]"
 
     rules_injection = f"\n**Specific Project Rules:**\n{custom_rules}\n" if custom_rules else ""
+
+    full_file_section = ""
+    full_file_note = ""
+    if fetched_files:
+        blocks = []
+        for path, content in fetched_files.items():
+            blocks.append(f"**File: {path}**\n```\n{content}\n```")
+        full_file_section = "\n**Full File Context:**\n" + "\n\n".join(blocks) + "\n"
+        full_file_note = (
+            "\n        7. The user message includes a **Full File Context:** section with the head version of "
+            "changed files and their direct imports. Treat that content as read only context for understanding "
+            "the diff; do not invent issues in code that is not part of the diff itself."
+        )
 
     # Get today's actual date
     current_date = datetime.now().strftime("%B %d, %Y")
@@ -119,14 +132,14 @@ def build_prompts(diff, mr_title, mr_description, custom_rules):
         3. IMPORTANT: Do not complain about missing imports or variables if they might be defined elsewhere in the file (you only see a diff).
         4. Provide code fixes using GitLab/GitHub suggestion syntax: ```suggestion ... ``` when possible.
         5. Provide strictly Markdown. No greetings or preambles.
-        6. If flawless, reply: "### \nLooks good to me! 🚀 No issues found."
+        6. If flawless, reply: "### \nLooks good to me! 🚀 No issues found."{full_file_note}
     """).strip()
 
     user_prompt = textwrap.dedent(f"""
         Context regarding these changes:
         **MR Title:** {mr_title}
         **MR Description:** {mr_description}
-        {rules_injection}
+        {rules_injection}{full_file_section}
         Please review the following code changes:
         ```diff
         {diff}

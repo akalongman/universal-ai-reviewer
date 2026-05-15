@@ -2,8 +2,9 @@ import sys
 import re
 from config import Config
 from vcs_providers import get_vcs_provider
-from prompts import get_code_diff, get_custom_rules, build_prompts
+from prompts import get_code_diff, get_custom_rules, build_prompts, get_ignore_patterns
 from llm_providers import get_provider
+from context_fetcher import ContextFetcher, check_context_window, ContextTooLargeError
 
 
 def main():
@@ -15,7 +16,6 @@ def main():
         print(f"Configuration Error: {e}")
         sys.exit(1)
 
-    # --- ADD THIS DEBUG BLOCK ---
     print("\n" + "=" * 35)
     print("🔧 AI RUNTIME CONFIGURATION")
     print("=" * 35)
@@ -24,6 +24,8 @@ def main():
     print(f"AI Model       : {config.model_name}")
     print(f"Max Tokens     : {config.max_tokens}")
     print(f"Temperature    : {config.temperature if config.temperature is not None else '(provider default)'}")
+    print(f"Fetch Changed  : {config.fetch_changed_full}")
+    print(f"Fetch Related  : {config.fetch_related_files} (depth={config.fetch_related_depth})")
     print("=" * 35 + "\n")
 
 
@@ -42,21 +44,41 @@ def main():
 
     # 4. Create a Real-Time UI Indicator
     thinking_note = None
+    fetch_enabled = config.fetch_changed_full or config.fetch_related_files
+    extra_text = "(Fetching file context...)" if fetch_enabled else ""
     try:
         print(f"Creating placeholder comment for {config.provider.capitalize()}...")
-        thinking_note = vcs_client.create_placeholder_comment(config.provider)
+        thinking_note = vcs_client.create_placeholder_comment(config.provider, extra=extra_text)
     except Exception as e:
         print(f"Warning: Could not create placeholder comment: {e}")
 
-    # 5. Request Review from AI Provider
+    # 5. Fetch full file context (skipped entirely when both fetch env vars are off)
+    fetched_files = None
+    if fetch_enabled:
+        try:
+            ignore_patterns = get_ignore_patterns()
+            fetcher = ContextFetcher(vcs_client, config, ignore_patterns)
+            fetched_files = fetcher.fetch_for_diff(diff)
+            print(f"Fetched {len(fetched_files)} file(s) of additional context.")
+        except Exception as e:
+            error_msg = f"❌ **Context Fetch Failed:** {str(e)}"
+            print(error_msg)
+            if thinking_note:
+                vcs_client.update_or_create_comment(thinking_note, error_msg, config.provider)
+            sys.exit(1)
+
+    # 6. Request Review from AI Provider
     print(f"Analyzing code with {config.provider.capitalize()}...")
     try:
         system_prompt, user_prompt = build_prompts(
             diff,
             pr_details["title"],
             pr_details["description"],
-            custom_rules
+            custom_rules,
+            fetched_files=fetched_files,
         )
+
+        check_context_window(system_prompt, user_prompt, config.model_name)
 
         ai_provider = get_provider(config.provider)
         if config.provider == "gemini":
@@ -71,6 +93,12 @@ def main():
         if not review_text:
             raise ValueError(f"{config.provider.capitalize()} returned an empty response.")
 
+    except ContextTooLargeError as e:
+        error_msg = f"❌ **AI Review Failed:** {str(e)}"
+        print(error_msg)
+        if thinking_note:
+            vcs_client.update_or_create_comment(thinking_note, error_msg, config.provider)
+        sys.exit(1)
     except Exception as e:
         error_msg = f"❌ **AI Review Failed:** {str(e)}"
         print(error_msg)
@@ -78,7 +106,7 @@ def main():
             vcs_client.update_or_create_comment(thinking_note, error_msg, config.provider)
         sys.exit(1)
 
-    # 6. Post Final Results back to the PR/MR
+    # 7. Post Final Results back to the PR/MR
     print("Updating Pull/Merge Request with final review...")
     try:
         vcs_client.update_or_create_comment(thinking_note, review_text, config.provider)
@@ -87,11 +115,9 @@ def main():
         print(f"Error updating comment: {e}")
         sys.exit(1)
 
-    # 7. Status Gatekeeper
-    # Check if the header exists
+    # 8. Status Gatekeeper
     has_critical_header = "🔴 Critical Issues" in review_text
 
-    # This regex looks for the header followed by optional spaces/colons/newlines, then "none", "no", "0", or "n/a"
     is_false_alarm = bool(re.search(r'🔴 Critical Issues\s*[:\n]*\s*(none|no|0|n/a)\b', review_text, re.IGNORECASE))
 
     if has_critical_header and not is_false_alarm:

@@ -2,6 +2,14 @@ import os
 import sys
 
 
+_TRUTHY = {"true", "1", "yes"}
+
+
+def _env_bool(name: str) -> bool:
+    value = os.environ.get(name)
+    return bool(value) and value.strip().lower() in _TRUTHY
+
+
 class Config:
     def __init__(self):
         # 1. AI Provider Setup
@@ -26,6 +34,10 @@ class Config:
         temperature_env = os.environ.get("AI_TEMPERATURE")
         self.temperature = float(temperature_env) if temperature_env else None
 
+        self.fetch_changed_full = _env_bool("AI_FETCH_CHANGED_FULL")
+        self.fetch_related_files = _env_bool("AI_FETCH_RELATED_FILES")
+        self.fetch_related_depth = self._parse_depth(os.environ.get("AI_FETCH_RELATED_DEPTH"))
+
         # 2. Auto-Detect the CI/CD Environment
         self.vcs_type = self._detect_vcs()
 
@@ -41,6 +53,20 @@ class Config:
 
         self._load_vcs_vars()
         self._validate()
+
+    @staticmethod
+    def _parse_depth(raw):
+        if raw is None or raw == "":
+            return 1
+        try:
+            depth = int(raw)
+        except ValueError:
+            print(f"Error: AI_FETCH_RELATED_DEPTH must be a non negative integer, got: {raw!r}")
+            sys.exit(1)
+        if depth < 0:
+            print(f"Error: AI_FETCH_RELATED_DEPTH must be a non negative integer, got: {depth}")
+            sys.exit(1)
+        return depth
 
     def _detect_vcs(self):
         """Determines the hosting platform based on default runner variables."""

@@ -74,3 +74,42 @@ def test_get_ignore_patterns_empty_by_default():
     # Assert: It should return a completely empty list, not defaults
     assert patterns == []
     assert len(patterns) == 0
+
+
+def test_build_prompts_with_fetched_files_emits_section():
+    fetched = {"src/handler.js": "console.log('hi');"}
+    system_prompt, user_prompt = build_prompts(
+        "+ diff body", "Title", "Desc", "", fetched_files=fetched,
+    )
+    assert "**Full File Context:**" in user_prompt
+    assert "**File: src/handler.js**" in user_prompt
+    assert "console.log('hi');" in user_prompt
+    full_idx = user_prompt.index("**Full File Context:**")
+    diff_idx = user_prompt.index("```diff")
+    assert full_idx < diff_idx
+    assert "read only context" in system_prompt
+
+
+def test_build_prompts_without_fetched_files_omits_section():
+    system_prompt, user_prompt = build_prompts(
+        "+ diff body", "Title", "Desc", "", fetched_files=None,
+    )
+    assert "**Full File Context:**" not in user_prompt
+    assert "read only context" not in system_prompt
+
+
+def test_build_prompts_with_empty_fetched_dict_omits_section():
+    system_prompt, user_prompt = build_prompts(
+        "+ diff body", "Title", "Desc", "", fetched_files={},
+    )
+    assert "**Full File Context:**" not in user_prompt
+
+
+def test_build_prompts_preserves_category_header_contract_with_fetched_files():
+    fetched = {"src/x.js": "// x"}
+    system_prompt, _ = build_prompts(
+        "+ diff", "Title", "Desc", "", fetched_files=fetched,
+    )
+    assert "🔴 Critical Issues" in system_prompt
+    assert "🟡 Suggestions" not in system_prompt or "🟢 Nitpicks/Praise" in system_prompt
+    assert "OMIT" in system_prompt or "completely omit" in system_prompt.lower()
