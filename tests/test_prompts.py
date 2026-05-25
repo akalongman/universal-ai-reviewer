@@ -170,5 +170,29 @@ def test_critical_section_is_empty_rejects_adversarial_hedges(review_text):
     assert critical_section_is_empty(review_text) is False
 
 
+@pytest.mark.parametrize("review_text", [
+    # Allow-list-only attack: the body uses ONLY tokens from _ALLOWED_EMPTY_TOKENS
+    # but the second sentence is an affirmation, not a negation. The sentence-start
+    # check is what catches these — closed vocabulary alone is not sufficient.
+    "### 🔴 Critical Issues\n\nNone to report. Critical bugs found.",
+    "### 🔴 Critical Issues\n\nNone of any significance. Critical bugs identified.",
+    "### 🔴 Critical Issues\n\nNothing major. Critical issues found.",
+    "### 🔴 Critical Issues\n\nNo issues of significance. Critical bugs detected.",
+])
+def test_critical_section_is_empty_rejects_allow_list_only_attack(review_text):
+    """Regression guard for the sentence-start negation check.
+
+    These inputs all use only allow-list vocabulary, so the closed-vocabulary
+    check alone returns True. The second-sentence affirmation ("Critical bugs
+    found.") must force the section to be treated as non-empty.
+
+    This is the most subtle bypass class: a determined adversary or confused
+    model can use legitimate-looking vocabulary while still describing real
+    findings. The proper structural fix is a structured-output handshake;
+    this test guards the heuristic stopgap.
+    """
+    assert critical_section_is_empty(review_text) is False
+
+
 def test_critical_section_is_empty_without_header():
     assert critical_section_is_empty("### 🟡 Suggestions\n- Use a constant.") is False

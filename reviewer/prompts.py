@@ -37,12 +37,24 @@ def critical_section_is_empty(review_text: str) -> bool:
     markdown phrasings (bullets, bold, blockquotes, exclamation marks) around
     explicit negations like "None", "No critical issues found", or "N/A".
 
-    The check is intentionally strict: every token in the stripped body must be
-    drawn from a closed allow-list. This prevents adversarial hedges like
-    "None of significance, but SQL injection at file.py:42" from disabling the
-    gatekeeper. Any token outside the allow-list (e.g. "but", "watch", "sql")
-    forces the section to be treated as containing a real finding, which is the
-    correct fail-closed posture for a security gate.
+    Two checks layered on the stripped body:
+
+    1. Closed-vocabulary: every token must be in `_ALLOWED_EMPTY_TOKENS`. Catches
+       adversarial hedges like "None of significance, but SQL injection at
+       file.py:42" because words like "but", "watch", "sql" are out of vocabulary.
+
+    2. Sentence-start negation: every sentence in the body (split on `.!?`) must
+       begin with a word from `_NEGATION_WORDS`. Catches the
+       allow-list-only attack like "None to report. Critical bugs found." where
+       the adversarial payload lives in a second sentence that starts with
+       "Critical" rather than a negation.
+
+    KNOWN LIMITATION: these are heuristics, not proofs. A sufficiently clever
+    model output that uses only allow-listed vocabulary and starts every
+    sentence with a negation word could still slip through. The structurally
+    correct fix is to switch to structured output (the model emits a parseable
+    counter that the gatekeeper reads, instead of inspecting prose). See the
+    pending `gatekeeper-structured-output` OpenSpec change for that work.
     """
     header = re.search(r"🔴 Critical Issues[^\n]*\n", review_text)
     if not header:
@@ -57,7 +69,15 @@ def critical_section_is_empty(review_text: str) -> bool:
     tokens = stripped.split()
     if tokens[0] not in _NEGATION_WORDS:
         return False
-    return all(token in _ALLOWED_EMPTY_TOKENS for token in tokens)
+    if not all(token in _ALLOWED_EMPTY_TOKENS for token in tokens):
+        return False
+    for sentence in re.split(r"[.!?]", body.lower()):
+        sentence_stripped = _MARKDOWN_NOISE_RE.sub(" ", sentence).strip()
+        if not sentence_stripped:
+            continue
+        if sentence_stripped.split()[0] not in _NEGATION_WORDS:
+            return False
+    return True
 
 def get_ignore_patterns(file_path=".aiignore"):
     """Returns a list of patterns to ignore from a local .aiignore file."""
