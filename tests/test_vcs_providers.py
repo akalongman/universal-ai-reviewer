@@ -106,3 +106,40 @@ def test_gitlab_get_file_content_other_error_propagates():
     provider = _build_gitlab_provider(project)
     with pytest.raises(GitlabGetError):
         provider.get_file_content("src/Service.php", "head-sha-xyz")
+
+
+def test_gitlab_get_file_content_oversized_returns_none(capsys):
+    """Regression: large files (committed binaries, generated artifacts) must
+    be skipped before decode, otherwise a 100 MB file in someone else's repo
+    can OOM the CI runner. Size is checked against MAX_FILE_BYTES before
+    decode() is ever called."""
+    from reviewer.vcs_providers import MAX_FILE_BYTES
+    file_obj = MagicMock()
+    file_obj.size = MAX_FILE_BYTES + 1
+    project = MagicMock()
+    project.files.get.return_value = file_obj
+
+    provider = _build_gitlab_provider(project)
+    result = provider.get_file_content("vendor/huge.bin", "head-sha-xyz")
+
+    assert result is None
+    file_obj.decode.assert_not_called()
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.out
+    assert "vendor/huge.bin" in captured.out
+
+
+def test_github_get_file_content_oversized_returns_none(capsys):
+    from reviewer.vcs_providers import MAX_FILE_BYTES
+    content_file = MagicMock()
+    content_file.size = MAX_FILE_BYTES + 1
+    repo = MagicMock()
+    repo.get_contents.return_value = content_file
+
+    provider = _build_github_provider(repo)
+    result = provider.get_file_content("dist/bundle.min.js", "head-sha-abc")
+
+    assert result is None
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.out
+    assert "dist/bundle.min.js" in captured.out

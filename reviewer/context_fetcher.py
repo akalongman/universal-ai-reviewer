@@ -295,7 +295,11 @@ class PHPPathResolver:
         return None
 
 
-_DIFF_HEADER_RE = re.compile(r"^diff --git a/(.*?) b/(.*?)$")
+# The b/ path is the post-rename file identity; we use it consistently
+# with filter_diff in prompts.py so a renamed file is matched/fetched
+# under its new name. The optional quotes handle git's quoted-path
+# format for filenames containing spaces.
+_DIFF_HEADER_RE = re.compile(r'^diff --git "?a/(.+?)"? "?b/(.+?)"?$')
 
 
 def parse_changed_paths(diff_text: str):

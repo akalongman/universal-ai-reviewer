@@ -119,6 +119,32 @@ def test_parse_changed_paths_extracts_b_side():
     assert parse_changed_paths(diff) == ["src/handler.js", "src/Service.php"]
 
 
+def test_parse_changed_paths_uses_post_rename_path():
+    """When a file is renamed, the b/ path is the new identity. Downstream
+    .aiignore matching and ContextFetcher then operate on the new name,
+    which is the desired behavior (a file renamed *into* an ignored name
+    should be ignored under that new name)."""
+    diff = (
+        "diff --git a/old/name.py b/new/name.py\n"
+        "similarity index 90%\n"
+        "rename from old/name.py\n"
+        "rename to new/name.py\n"
+    )
+    assert parse_changed_paths(diff) == ["new/name.py"]
+
+
+def test_parse_changed_paths_handles_quoted_paths_with_spaces():
+    """Regression: git diff escapes filenames containing spaces with quotes
+    (`"a/path with space/file.py"`). The previous regex did not handle the
+    quoted form, silently dropping those files from changed-paths."""
+    diff = (
+        'diff --git "a/path with space/file.py" "b/path with space/file.py"\n'
+        '--- "a/path with space/file.py"\n'
+        '+++ "b/path with space/file.py"\n'
+    )
+    assert parse_changed_paths(diff) == ["path with space/file.py"]
+
+
 def test_is_ignored_matches_bare_and_nested():
     assert is_ignored("package-lock.json", ["package-lock.json"])
     assert is_ignored("frontend/package-lock.json", ["package-lock.json"])

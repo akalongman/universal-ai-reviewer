@@ -116,8 +116,13 @@ def filter_diff(diff_text, ignore_patterns):
             current_file_diff = [line]
             keep_file = True
 
-            # Extract filename from 'diff --git a/path/to/file.txt b/path/to/file.txt'
-            match = re.match(r'^diff --git a/(.*?) b/(.*?)$', line.strip())
+            # Extract filename from 'diff --git a/path b/path'. The b/ path
+            # is the post-rename identity of the file; matching .aiignore
+            # against it is intentional, so that a real source file renamed
+            # into an ignored name (or vice versa) is matched on its new
+            # name. The optional quote handles git's quoted-path format for
+            # filenames containing spaces ('"a/path with space" "b/...").
+            match = re.match(r'^diff --git "?a/(.+?)"? "?b/(.+?)"?$', line.strip())
             if match:
                 filename = match.group(2)
                 # Check if the filename matches any of our ignore patterns

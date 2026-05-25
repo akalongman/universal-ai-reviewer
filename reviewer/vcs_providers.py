@@ -4,6 +4,15 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
+# Per-file size cap for full-content fetching. Source files in a reasonable
+# repo are well under this; anything larger (committed binaries, generated
+# artifacts, vendor blobs) gets skipped with a warning to protect the CI
+# runner from OOM. The check_context_window call later guards the
+# *assembled* prompt size; this guards the per-file decode that happens
+# before the assembly step ever runs.
+MAX_FILE_BYTES = 1_048_576  # 1 MiB
+
+
 class VCSProvider(ABC):
     """Abstract Base Class defining the standard operations for any Code Hosting Platform."""
 
@@ -68,6 +77,14 @@ class GitLabProvider(VCSProvider):
             if getattr(exc, "response_code", None) == 404:
                 return None
             raise
+        size = getattr(file_obj, "size", None)
+        if isinstance(size, int) and size > MAX_FILE_BYTES:
+            print(
+                f"WARNING: skipping {path} for full-content fetch "
+                f"({size} bytes > {MAX_FILE_BYTES} byte cap). "
+                "Increase MAX_FILE_BYTES if this was intentional."
+            )
+            return None
         raw = file_obj.decode()
         if isinstance(raw, bytes):
             try:
@@ -125,6 +142,14 @@ class GitHubProvider(VCSProvider):
         except UnknownObjectException:
             return None
         if isinstance(content_file, list):
+            return None
+        size = getattr(content_file, "size", None)
+        if isinstance(size, int) and size > MAX_FILE_BYTES:
+            print(
+                f"WARNING: skipping {path} for full-content fetch "
+                f"({size} bytes > {MAX_FILE_BYTES} byte cap). "
+                "Increase MAX_FILE_BYTES if this was intentional."
+            )
             return None
         raw = content_file.decoded_content
         if isinstance(raw, bytes):
