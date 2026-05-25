@@ -129,6 +129,11 @@ def test_build_prompts_preserves_category_header_contract_with_fetched_files():
     "### 🔴 Critical Issues\n\n0 issues found.",
     "### 🔴 Critical Issues\n\n> No issues.\n\n### 🟡 Suggestions\n- Real suggestion",
     "### 🔴 Critical Issues\n",
+    "### 🔴 Critical Issues\n\nNo critical issues found.",
+    "### 🔴 Critical Issues\n\nNothing critical.",
+    "### 🔴 Critical Issues\n\nNo blocking issues.",
+    "### 🔴 Critical Issues\n\nNo major issues to report.",
+    "### 🔴 Critical Issues\n\nNone of significance.",
 ])
 def test_critical_section_is_empty_recognises_negations(review_text):
     assert critical_section_is_empty(review_text) is True
@@ -140,6 +145,28 @@ def test_critical_section_is_empty_recognises_negations(review_text):
     "🔴 Critical Issues\n1. Hardcoded credential\n2. Missing auth check",
 ])
 def test_critical_section_is_empty_detects_real_issues(review_text):
+    assert critical_section_is_empty(review_text) is False
+
+
+@pytest.mark.parametrize("review_text", [
+    # The "None, but..." pattern that previously slipped through and let real
+    # findings ship past the gatekeeper. The closed-vocabulary check rejects
+    # each of these because the body contains at least one token outside the
+    # allow-list ("but", "however", "except", "minor", "hardcoded", "sql",
+    # filenames, etc).
+    "### 🔴 Critical Issues\n\nNone of significance, but watch the SQL injection at file.py:42",
+    "### 🔴 Critical Issues\n\nNo blocking issues, however a race condition in the worker pool may be exploitable",
+    "### 🔴 Critical Issues\n\nNo major problems found. Minor: hardcoded credential at config.py:18 (could be promoted to critical)",
+    "### 🔴 Critical Issues\n\nNone, except SQL injection at users.py:42",
+    "### 🔴 Critical Issues\n\nNo critical issues but the auth middleware bypasses CSRF protection",
+])
+def test_critical_section_is_empty_rejects_adversarial_hedges(review_text):
+    """Regression guard for the closed-vocabulary check.
+
+    A real finding mixed into a "None"-led section MUST fail the gatekeeper.
+    The previous first-word-only check returned True for all of these and let
+    the build pass with critical issues described in plain text.
+    """
     assert critical_section_is_empty(review_text) is False
 
 

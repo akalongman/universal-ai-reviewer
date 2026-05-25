@@ -8,17 +8,41 @@ from datetime import datetime
 
 MAX_DIFF_SIZE = 50000
 
-_NEGATION_WORDS = {"none", "no", "0", "n/a", "na"}
+_NEGATION_WORDS = {"none", "no", "0", "n/a", "na", "nothing"}
+
+# A "truly empty" critical section must consist ONLY of tokens from this set.
+# The vocabulary is intentionally narrow: adversarial hedges like
+# "None of significance, but SQL injection at file.py:42" contain at least one
+# token outside this set (here: "but", "watch", "sql", "injection"), which
+# forces the gatekeeper to escalate. Extend this set only when a real model
+# output legitimately needs a word that is not yet here. Each addition is a
+# small attack-surface increase that should be reviewed deliberately.
+_ALLOWED_EMPTY_TOKENS = {
+    "none", "no", "0", "n/a", "na", "nothing",
+    "issues", "critical", "problems", "concerns", "bugs",
+    "found", "identified", "detected",
+    "of", "any",
+    "major", "blocking", "significant", "significance",
+    "to", "report", "flag",
+}
+
 _MARKDOWN_NOISE_RE = re.compile(r"[\s\-\*>_`:.()\[\]!]+")
 
 
 def critical_section_is_empty(review_text: str) -> bool:
-    """Return True when the AI wrote a 🔴 Critical Issues header but its body is a negation.
+    """Return True when the AI wrote a 🔴 Critical Issues header but its body is purely negation.
 
-    The system prompt instructs the model to OMIT the header entirely when there are
-    no critical issues, but models drift. This backstop tolerates common markdown
-    phrasings (bullets, bold, blockquotes, exclamation marks) that the previous
-    regex-only check missed and that were silently failing CI.
+    The system prompt instructs the model to OMIT the header entirely when there
+    are no critical issues, but models drift. This backstop tolerates common
+    markdown phrasings (bullets, bold, blockquotes, exclamation marks) around
+    explicit negations like "None", "No critical issues found", or "N/A".
+
+    The check is intentionally strict: every token in the stripped body must be
+    drawn from a closed allow-list. This prevents adversarial hedges like
+    "None of significance, but SQL injection at file.py:42" from disabling the
+    gatekeeper. Any token outside the allow-list (e.g. "but", "watch", "sql")
+    forces the section to be treated as containing a real finding, which is the
+    correct fail-closed posture for a security gate.
     """
     header = re.search(r"🔴 Critical Issues[^\n]*\n", review_text)
     if not header:
@@ -30,7 +54,10 @@ def critical_section_is_empty(review_text: str) -> bool:
     stripped = _MARKDOWN_NOISE_RE.sub(" ", body).strip().lower()
     if not stripped:
         return True
-    return stripped.split()[0] in _NEGATION_WORDS
+    tokens = stripped.split()
+    if tokens[0] not in _NEGATION_WORDS:
+        return False
+    return all(token in _ALLOWED_EMPTY_TOKENS for token in tokens)
 
 def get_ignore_patterns(file_path=".aiignore"):
     """Returns a list of patterns to ignore from a local .aiignore file."""
