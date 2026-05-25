@@ -81,6 +81,23 @@ def test_extract_imports_php_grouped_nested():
     assert result == {"App\\Sub\\X\\Y", "App\\Sub\\Z"}
 
 
+def test_extract_imports_php_aliased_use():
+    """Regression: `use Foo\\Bar as Baz;` previously added both `Foo\\Bar` and
+    the alias `Baz` to the import set. The alias is not a resolvable namespace
+    and caused wasted resolution attempts. Now only the source namespace is
+    extracted."""
+    result = extract_imports_php("<?php use App\\Services\\UserService as US;")
+    assert result == {"App\\Services\\UserService"}
+
+
+def test_extract_imports_php_grouped_with_alias():
+    """Regression: grouped imports with aliases (`use App\\{Foo, Bar as B};`)
+    previously yielded `App\\Foo` and `App\\Bar as B` (the literal " as B"
+    suffix included in the namespace). Now the alias is stripped."""
+    result = extract_imports_php("<?php use App\\{Foo, Bar as B};")
+    assert result == {"App\\Foo", "App\\Bar"}
+
+
 def test_extract_imports_dispatches_by_path():
     assert extract_imports("import x from './a';", "src/x.js") == {"./a"}
     assert extract_imports("<?php use A\\B;", "src/x.php") == {"A\\B"}
@@ -126,6 +143,27 @@ def test_js_resolver_tsconfig_alias(tmp_path):
     resolver = JSPathResolver(str(tmp_path), lambda p: os.path.isfile(os.path.join(str(tmp_path), p)))
     resolved = resolver.resolve("@app/utils", "src/handler.ts")
     assert resolved == os.path.normpath("src/utils.ts")
+
+
+def test_js_resolver_preserves_urls_in_tsconfig_values(tmp_path):
+    """Regression: the JSONC comment stripper previously truncated URLs in
+    string values because `//.*$` matched the `//` after the protocol scheme.
+    A tsconfig with a URL value in a path target must still parse and resolve
+    relative aliases correctly."""
+    (tmp_path / "tsconfig.json").write_text(
+        '{\n'
+        '  // a real comment that should be stripped\n'
+        '  "compilerOptions": {\n'
+        '    "baseUrl": ".",\n'
+        '    "paths": {"@app/*": ["src/*"]},\n'
+        '    "_docs": "see https://example.com/docs for details"\n'
+        '  }\n'
+        '}\n'
+    )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "utils.ts").write_text("export const x = 1;")
+    resolver = JSPathResolver(str(tmp_path), lambda p: os.path.isfile(os.path.join(str(tmp_path), p)))
+    assert resolver.resolve("@app/utils", "src/handler.ts") == os.path.normpath("src/utils.ts")
 
 
 def test_js_resolver_unresolved_returns_none(tmp_path):

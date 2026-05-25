@@ -66,7 +66,7 @@ def _collect_import_strings(node, out: set):
         _collect_import_strings(child, out)
 
 
-def _string_literal_value(string_node) -> Optional[str]:
+def _string_literal_value(string_node) -> str:
     for child in string_node.children:
         if child.type == "string_fragment":
             return child.text.decode("utf-8", errors="ignore")
@@ -82,7 +82,6 @@ def _extract_imports(source: str, language: str) -> set:
     tree = parser.parse(source.encode("utf-8"))
     found = set()
     _collect_import_strings(tree.root_node, found)
-    found.discard(None)
     return found
 
 
@@ -117,6 +116,10 @@ def _collect_php_use(node, out: set):
                 if child.type == "namespace_use_clause":
                     member = child.text.decode("utf-8", errors="ignore").strip()
                     if member:
+                        # Drop any "as Alias" suffix; PHP namespaces have no
+                        # spaces, so the first whitespace-delimited token is
+                        # always the original namespace path.
+                        member = member.split()[0]
                         out.add(group_prefix + member)
             return
 
@@ -124,6 +127,10 @@ def _collect_php_use(node, out: set):
             for grandchild in clause.children:
                 if grandchild.type in ("qualified_name", "namespace_name", "name"):
                     out.add(grandchild.text.decode("utf-8", errors="ignore"))
+                    # Only the first identifier in the clause is the original
+                    # namespace. Subsequent children are the "as Alias" target,
+                    # which is not a resolvable namespace specifier.
+                    break
         return
     for child in node.children:
         _collect_php_use(child, out)
@@ -157,7 +164,12 @@ def _load_json_safely(path: str):
     try:
         with open(path, "r", encoding="utf-8") as fh:
             text = fh.read()
-        text = re.sub(r"//.*?$|/\*.*?\*/", "", text, flags=re.MULTILINE | re.DOTALL)
+        # Strip JSONC-style comments. The negative lookbehind prevents the
+        # `//` in URLs (e.g. `"baseUrl": "https://example.com"`) from being
+        # treated as a line comment: URLs always have a letter or `:` before
+        # `//`, while real comments start at indentation or after JSON
+        # punctuation. This is a heuristic, not a full string-aware parser.
+        text = re.sub(r"(?<![a-zA-Z:])//.*?$|/\*.*?\*/", "", text, flags=re.MULTILINE | re.DOTALL)
         return json.loads(text)
     except (OSError, json.JSONDecodeError):
         return None
