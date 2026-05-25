@@ -124,5 +124,6 @@ def test_openai_reviewer_stream_parsing(mock_openai_class):
     call_kwargs = mock_client_instance.chat.completions.create.call_args.kwargs
     assert call_kwargs['model'] == "gpt-4o"
     assert call_kwargs['temperature'] == 0.2
-    assert call_kwargs['max_tokens'] == 8192
+    assert call_kwargs['max_completion_tokens'] == 8192
+    assert 'max_tokens' not in call_kwargs
     assert call_kwargs['stream'] is True

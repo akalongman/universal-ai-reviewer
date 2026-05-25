@@ -5,6 +5,33 @@ import re
 import fnmatch
 from datetime import datetime
 
+
+MAX_DIFF_SIZE = 50000
+
+_NEGATION_WORDS = {"none", "no", "0", "n/a", "na"}
+_MARKDOWN_NOISE_RE = re.compile(r"[\s\-\*>_`:.()\[\]!]+")
+
+
+def critical_section_is_empty(review_text: str) -> bool:
+    """Return True when the AI wrote a 🔴 Critical Issues header but its body is a negation.
+
+    The system prompt instructs the model to OMIT the header entirely when there are
+    no critical issues, but models drift. This backstop tolerates common markdown
+    phrasings (bullets, bold, blockquotes, exclamation marks) that the previous
+    regex-only check missed and that were silently failing CI.
+    """
+    header = re.search(r"🔴 Critical Issues[^\n]*\n", review_text)
+    if not header:
+        return False
+    body_start = header.end()
+    next_section = re.search(r"\n#{1,6}\s|\n🟡|\n🟢", review_text[body_start:])
+    body_end = body_start + next_section.start() if next_section else len(review_text)
+    body = review_text[body_start:body_end]
+    stripped = _MARKDOWN_NOISE_RE.sub(" ", body).strip().lower()
+    if not stripped:
+        return True
+    return stripped.split()[0] in _NEGATION_WORDS
+
 def get_ignore_patterns(file_path=".aiignore"):
     """Returns a list of patterns to ignore from a local .aiignore file."""
     patterns = []
@@ -63,7 +90,7 @@ def filter_diff(diff_text, ignore_patterns):
     return "".join(filtered_diff)
 
 
-def get_code_diff(file_path="mr_diff.txt"):
+def get_code_diff(file_path="mr_diff.txt", ignore_patterns=None):
     try:
         with open(file_path, "r") as file:
             diff = file.read()
@@ -71,8 +98,8 @@ def get_code_diff(file_path="mr_diff.txt"):
         print(f"No diff file found at {file_path}.")
         sys.exit(1)
 
-    # Apply Smart Filtering
-    ignore_patterns = get_ignore_patterns()
+    if ignore_patterns is None:
+        ignore_patterns = get_ignore_patterns()
     diff = filter_diff(diff, ignore_patterns)
 
     if not diff.strip():
@@ -94,8 +121,13 @@ def get_custom_rules(file_path=".ai-rules.md"):
 
 
 def build_prompts(diff, mr_title, mr_description, custom_rules, fetched_files=None):
-    MAX_DIFF_SIZE = 50000
     if len(diff) > MAX_DIFF_SIZE:
+        dropped = len(diff) - MAX_DIFF_SIZE
+        print(
+            f"WARNING: diff exceeded {MAX_DIFF_SIZE} chars; {dropped} chars truncated. "
+            f"The model will review only the first {MAX_DIFF_SIZE} chars and may miss "
+            f"issues in the dropped section."
+        )
         diff = diff[:MAX_DIFF_SIZE] + "\n\n... [truncated for token limits]"
 
     rules_injection = f"\n**Specific Project Rules:**\n{custom_rules}\n" if custom_rules else ""
@@ -132,7 +164,7 @@ def build_prompts(diff, mr_title, mr_description, custom_rules, fetched_files=No
         3. IMPORTANT: Do not complain about missing imports or variables if they might be defined elsewhere in the file (you only see a diff).
         4. Provide code fixes using GitLab/GitHub suggestion syntax: ```suggestion ... ``` when possible.
         5. Provide strictly Markdown. No greetings or preambles.
-        6. If flawless, reply: "### \nLooks good to me! 🚀 No issues found."{full_file_note}
+        6. If flawless, reply: "### Looks good to me! 🚀 No issues found."{full_file_note}
     """).strip()
 
     user_prompt = textwrap.dedent(f"""

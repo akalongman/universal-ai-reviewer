@@ -29,7 +29,7 @@ This document outlines planned features and improvements to make this tool a tie
   - **What:** Hash the `mr_diff.txt` and store the AI's markdown response in the CI/CD cache using the hash as the key.
   - **Why:** Prevents wasting API tokens and saves time when developers click "Retry Pipeline" on flaky tests without actually changing the code.
   - **Effort:** Medium.
-Upd
+
 ## 🛠️ Codebase Polish
 
 - [ ] **Add Python Type Hints**

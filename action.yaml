@@ -1,10 +1,10 @@
 name: 'Universal AI Code Reviewer'
-description: 'AI-powered code review for Pull Requests using Claude or Gemini'
+description: 'AI-powered code review for Pull Requests using Claude, Gemini, or OpenAI'
 author: 'akalongman'
 
 inputs:
   ai_provider:
-    description: 'The AI provider to use: anthropic or gemini'
+    description: 'The AI provider to use: anthropic, gemini, or openai'
     required: false
     default: 'anthropic'
   anthropic_api_key:
@@ -12,6 +12,9 @@ inputs:
     required: false
   gemini_api_key:
     description: 'Gemini API Key (Required if using Gemini)'
+    required: false
+  openai_api_key:
+    description: 'OpenAI API Key (Required if using OpenAI)'
     required: false
 
 runs:

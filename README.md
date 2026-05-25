@@ -9,7 +9,7 @@ Built with extensibility in mind, this tool uses the Strategy pattern to seamles
 ## ✨ Key Features
 
 * **Multi-VCS Support:** Native integration with **GitHub Actions** and **GitLab CI**.
-* **Multi-Model Support:** Choose between **Claude 3.5 Sonnet** (Anthropic), **Gemini 2.0 Flash/Pro** (Google), or **GPT-4o** (OpenAI).
+* **Multi-Model Support:** Choose between **Claude Sonnet 4.6** (Anthropic), **Gemini 2.5 Pro** (Google), or **GPT-4o** (OpenAI).
 * **Smart File Filtering:** Automatically ignores noisy files (like `package-lock.json`, `dist/`, `*.svg`) to save tokens and prevent hallucinated issues. Fully customizable via an `.aiignore` file.
 * **Highly Configurable:** Fine-tune the review by choosing specific models, setting token limits, and adjusting the AI temperature.
 * **Strategy Pattern Architecture:** Clean, modular Python codebase that is easy to extend.
@@ -46,6 +46,11 @@ GitLab users can include this template directly from GitHub. The template automa
 ```yaml
 include:
   - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/1.0.0/gitlab-template.yml'
+
+variables:
+  # Pin the cloned reviewer code to the same ref as the template you include above.
+  # Defaults to "main" if unset, which can drift away from the pinned template.
+  AI_REVIEWER_REF: "1.0.0"
 
 # Ensure you have a 'review' stage defined
 stages:
@@ -88,7 +93,7 @@ The script automatically detects whether it is running in GitHub or GitLab. You 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `AI_PROVIDER` | `anthropic` | Set to `openai` or `gemini` to use other models. |
-| `AI_MODEL` | Provider Dependent | Defaults to `claude-3-5-sonnet-latest`, `gemini-2.0-flash`, or `gpt-4o`. |
+| `AI_MODEL` | Provider Dependent | Defaults to `claude-sonnet-4-6`, `gemini-2.5-pro`, or `gpt-4o`. |
 | `AI_MAX_TOKENS` | `8192` | The maximum length of the AI response. |
 | `AI_TEMPERATURE` | *(unset)* | Controls randomness (0.0 is strict, 1.0 is creative). If left unset, the parameter is omitted from the request entirely so the provider's own default applies. See the note below before setting this. |
 | `ANTHROPIC_API_KEY` | - | Required if using the Anthropic provider. |

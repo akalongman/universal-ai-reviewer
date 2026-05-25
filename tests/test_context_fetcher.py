@@ -159,6 +159,16 @@ def test_php_resolver_unresolved_returns_none(tmp_path):
     assert resolver.resolve("Foo\\Bar\\Baz") is None
 
 
+def test_php_resolver_bare_namespace_returns_none(tmp_path):
+    (tmp_path / "composer.json").write_text(
+        '{"autoload": {"psr-4": {"App\\\\": "src/"}}}'
+    )
+    (tmp_path / "src").mkdir()
+    resolver = PHPPathResolver(str(tmp_path), lambda p: os.path.isfile(os.path.join(str(tmp_path), p)))
+    assert resolver.resolve("App") is None
+    assert resolver.resolve("App\\") is None
+
+
 def _make_config(*, changed=False, related=False, depth=1):
     cfg = MagicMock()
     cfg.fetch_changed_full = changed
@@ -274,3 +284,15 @@ def test_check_context_window_uses_default_for_unknown_model():
     huge = "x" * (200_000 * 4)
     with pytest.raises(ContextTooLargeError):
         check_context_window("", huge, "totally-unknown-model")
+
+
+def test_overflow_error_names_real_env_var():
+    """Regression guard: the actionable error message MUST name AI_FETCH_CHANGED_FULL
+    (the real variable), not the AI_FETCH_FULL_FILES typo that previously sent
+    operators chasing a variable that does not exist in Config."""
+    huge = "x" * (CONTEXT_WINDOWS["gpt-4o"] * 4)
+    with pytest.raises(ContextTooLargeError) as exc_info:
+        check_context_window("", huge, "gpt-4o")
+    message = str(exc_info.value)
+    assert "AI_FETCH_CHANGED_FULL" in message
+    assert "AI_FETCH_FULL_FILES" not in message

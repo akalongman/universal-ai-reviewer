@@ -63,7 +63,7 @@ class OpenAIReviewer(AIProvider):
 
         kwargs = {
             "model": config.model_name,
-            "max_tokens": config.max_tokens,
+            "max_completion_tokens": config.max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

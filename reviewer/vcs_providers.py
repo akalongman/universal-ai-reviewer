@@ -1,7 +1,5 @@
-import os
 import sys
 import json
-import base64
 from abc import ABC, abstractmethod
 from typing import Optional
 

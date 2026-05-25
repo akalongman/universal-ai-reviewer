@@ -27,6 +27,13 @@ class Config:
                 self.model_name = "gemini-2.5-pro"
             elif self.provider == "openai":
                 self.model_name = "gpt-4o"
+            else:
+                print(
+                    f"Error: Unknown AI_PROVIDER '{self.provider}'. "
+                    "Expected one of: anthropic, gemini, openai. "
+                    "Set AI_MODEL explicitly when using a custom provider name."
+                )
+                sys.exit(1)
 
 
         self.max_tokens = int(os.environ.get("AI_MAX_TOKENS", "8192"))
@@ -129,3 +136,19 @@ class Config:
         if missing:
             print(f"Error: Missing required environment variables: {', '.join(missing)}")
             sys.exit(1)
+
+    @property
+    def active_api_key(self):
+        """Return the API key for the configured AI provider.
+
+        Centralised here so orchestration code never has to know which provider name
+        maps to which key attribute. Returns None for unknown providers; validation
+        in `_validate` already prevents that path at runtime.
+        """
+        if self.provider == "anthropic":
+            return self.anthropic_api_key
+        if self.provider == "gemini":
+            return self.gemini_api_key
+        if self.provider == "openai":
+            return self.openai_api_key
+        return None

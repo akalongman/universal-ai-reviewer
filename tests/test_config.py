@@ -74,3 +74,37 @@ def test_fetch_related_depth_negative_fails(base_env, monkeypatch):
     monkeypatch.setenv("AI_FETCH_RELATED_DEPTH", "-1")
     with pytest.raises(SystemExit):
         Config()
+
+
+def test_active_api_key_returns_anthropic_by_default(base_env):
+    config = Config()
+    assert config.active_api_key == "fake-anthropic-key"
+
+
+def test_active_api_key_returns_openai_when_selected(base_env, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-openai-key")
+    config = Config()
+    assert config.active_api_key == "fake-openai-key"
+
+
+def test_active_api_key_returns_gemini_when_selected(base_env, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-gemini-key")
+    config = Config()
+    assert config.active_api_key == "fake-gemini-key"
+
+
+def test_unknown_provider_without_model_fails_fast(base_env, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "ollama")
+    monkeypatch.delenv("AI_MODEL", raising=False)
+    with pytest.raises(SystemExit):
+        Config()
+
+
+def test_unknown_provider_with_explicit_model_is_allowed_at_model_step(base_env, monkeypatch):
+    """Setting AI_MODEL explicitly lets a custom provider name through the model picker;
+    the run still fails at api-key validation, which is the correct place."""
+    monkeypatch.setenv("AI_PROVIDER", "ollama")
+    monkeypatch.setenv("AI_MODEL", "llama3")
+    Config()

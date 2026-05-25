@@ -201,7 +201,7 @@ class JSPathResolver:
         if specifier in self._package_imports:
             candidate = self._package_imports[specifier]
             if isinstance(candidate, str):
-                return self._existing_path(candidate.lstrip("./"))
+                return self._existing_path(candidate.removeprefix("./"))
 
         if specifier.startswith("."):
             base_dir = os.path.dirname(from_file)
@@ -214,7 +214,7 @@ class JSPathResolver:
         if alias.endswith("/*") and specifier.startswith(alias[:-1]):
             remainder = specifier[len(alias) - 1:]
             for target in targets:
-                base = target.rstrip("/*").rstrip("/")
+                base = target.removesuffix("/*").rstrip("/")
                 resolved = self._try_extensions(os.path.join(base, remainder.lstrip("/")))
                 if resolved:
                     return resolved
@@ -269,14 +269,17 @@ class PHPPathResolver:
     def resolve(self, specifier: str) -> Optional[str]:
         specifier = specifier.lstrip("\\")
         for prefix, targets in self._psr4:
-            normalized_prefix = prefix
-            if specifier == prefix.rstrip("\\") or specifier.startswith(prefix):
-                remainder = specifier[len(prefix):]
-                relative_path = remainder.replace("\\", "/") + ".php"
-                for target in targets:
-                    candidate = os.path.normpath(os.path.join(target, relative_path))
-                    if self._file_exists(candidate):
-                        return candidate
+            if not specifier.startswith(prefix):
+                continue
+            remainder = specifier[len(prefix):]
+            if not remainder:
+                # Bare namespace import (e.g. `use App;`) has no single file target.
+                continue
+            relative_path = remainder.replace("\\", "/") + ".php"
+            for target in targets:
+                candidate = os.path.normpath(os.path.join(target, relative_path))
+                if self._file_exists(candidate):
+                    return candidate
         return None
 
 
@@ -383,7 +386,12 @@ class ContextFetcher:
                     specifiers = extract_imports(content, from_path)
                 except RuntimeError:
                     raise
-                except Exception:
+                except Exception as exc:
+                    print(
+                        f"WARNING: tree-sitter parse failed for {from_path} "
+                        f"({type(exc).__name__}: {exc}); related imports for this "
+                        "file will be skipped."
+                    )
                     specifiers = set()
                 for specifier in specifiers:
                     resolved = self._resolve_specifier(specifier, from_path)
@@ -431,6 +439,6 @@ def check_context_window(system_prompt: str, user_prompt: str, model_name: str):
     estimated = estimate_tokens(system_prompt) + estimate_tokens(user_prompt)
     if estimated > budget:
         raise ContextTooLargeError(
-            f"context too large: disable AI_FETCH_FULL_FILES, lower AI_FETCH_RELATED_DEPTH, "
+            f"context too large: disable AI_FETCH_CHANGED_FULL, lower AI_FETCH_RELATED_DEPTH, "
             f"or reduce the PR scope (estimated {estimated} tokens; budget {budget} for {model_name})"
         )

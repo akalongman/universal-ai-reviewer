@@ -1,5 +1,5 @@
 import pytest
-from reviewer.prompts import build_prompts
+from reviewer.prompts import build_prompts, MAX_DIFF_SIZE, critical_section_is_empty
 from reviewer.prompts import filter_diff, get_ignore_patterns
 
 
@@ -27,14 +27,19 @@ def test_build_prompts_without_custom_rules():
 
 
 def test_build_prompts_truncates_massive_diffs():
-    # Create a fake diff that is 60,000 characters long
-    massive_diff = "a" * 60000
+    massive_diff = "a" * (MAX_DIFF_SIZE + 10000)
 
     system_prompt, user_prompt = build_prompts(massive_diff, "Title", "Desc", "")
 
-    # Verify the safety truncation worked
-    assert len(user_prompt) < 60000
+    assert len(user_prompt) < len(massive_diff)
     assert "... [truncated for token limits]" in user_prompt
+
+
+def test_build_prompts_truncation_logs_warning(capsys):
+    build_prompts("a" * (MAX_DIFF_SIZE + 500), "Title", "Desc", "")
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.out
+    assert "500" in captured.out
 
 
 def test_filter_diff_removes_noisy_files():
@@ -113,3 +118,30 @@ def test_build_prompts_preserves_category_header_contract_with_fetched_files():
     assert "🔴 Critical Issues" in system_prompt
     assert "🟡 Suggestions" not in system_prompt or "🟢 Nitpicks/Praise" in system_prompt
     assert "OMIT" in system_prompt or "completely omit" in system_prompt.lower()
+
+
+@pytest.mark.parametrize("review_text", [
+    "### 🔴 Critical Issues\n\nNone.",
+    "### 🔴 Critical Issues\n\n- None",
+    "### 🔴 Critical Issues\n\n**None.**",
+    "🔴 Critical Issues:\n- N/A",
+    "## 🔴 Critical Issues\n\n*None identified*",
+    "### 🔴 Critical Issues\n\n0 issues found.",
+    "### 🔴 Critical Issues\n\n> No issues.\n\n### 🟡 Suggestions\n- Real suggestion",
+    "### 🔴 Critical Issues\n",
+])
+def test_critical_section_is_empty_recognises_negations(review_text):
+    assert critical_section_is_empty(review_text) is True
+
+
+@pytest.mark.parametrize("review_text", [
+    "### 🔴 Critical Issues\n\n- SQL injection in `update_user` (file.py:42)",
+    "### 🔴 Critical Issues\n\n**Race condition** in the worker pool.",
+    "🔴 Critical Issues\n1. Hardcoded credential\n2. Missing auth check",
+])
+def test_critical_section_is_empty_detects_real_issues(review_text):
+    assert critical_section_is_empty(review_text) is False
+
+
+def test_critical_section_is_empty_without_header():
+    assert critical_section_is_empty("### 🟡 Suggestions\n- Use a constant.") is False

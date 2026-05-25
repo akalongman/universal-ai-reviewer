@@ -1,10 +1,15 @@
 import sys
-import re
 from config import Config
 from vcs_providers import get_vcs_provider
-from prompts import get_code_diff, get_custom_rules, build_prompts, get_ignore_patterns
+from prompts import (
+    get_code_diff,
+    get_custom_rules,
+    build_prompts,
+    get_ignore_patterns,
+    critical_section_is_empty,
+)
 from llm_providers import get_provider
-from context_fetcher import ContextFetcher, check_context_window, ContextTooLargeError
+from context_fetcher import ContextFetcher, check_context_window
 
 
 def main():
@@ -39,7 +44,8 @@ def main():
         sys.exit(1)
 
     # 3. Read local diff and project rules
-    diff = get_code_diff()
+    ignore_patterns = get_ignore_patterns()
+    diff = get_code_diff(ignore_patterns=ignore_patterns)
     custom_rules = get_custom_rules()
 
     # 4. Create a Real-Time UI Indicator
@@ -56,7 +62,6 @@ def main():
     fetched_files = None
     if fetch_enabled:
         try:
-            ignore_patterns = get_ignore_patterns()
             fetcher = ContextFetcher(vcs_client, config, ignore_patterns)
             fetched_files = fetcher.fetch_for_diff(diff)
             print(f"Fetched {len(fetched_files)} file(s) of additional context.")
@@ -81,24 +86,11 @@ def main():
         check_context_window(system_prompt, user_prompt, config.model_name)
 
         ai_provider = get_provider(config.provider)
-        if config.provider == "gemini":
-            api_key = config.gemini_api_key
-        elif config.provider == "openai":
-            api_key = config.openai_api_key
-        else:
-            api_key = config.anthropic_api_key
-
-        review_text = ai_provider.review(system_prompt, user_prompt, api_key, config)
+        review_text = ai_provider.review(system_prompt, user_prompt, config.active_api_key, config)
 
         if not review_text:
             raise ValueError(f"{config.provider.capitalize()} returned an empty response.")
 
-    except ContextTooLargeError as e:
-        error_msg = f"❌ **AI Review Failed:** {str(e)}"
-        print(error_msg)
-        if thinking_note:
-            vcs_client.update_or_create_comment(thinking_note, error_msg, config.provider)
-        sys.exit(1)
     except Exception as e:
         error_msg = f"❌ **AI Review Failed:** {str(e)}"
         print(error_msg)
@@ -118,9 +110,7 @@ def main():
     # 8. Status Gatekeeper
     has_critical_header = "🔴 Critical Issues" in review_text
 
-    is_false_alarm = bool(re.search(r'🔴 Critical Issues\s*[:\n]*\s*(none|no|0|n/a)\b', review_text, re.IGNORECASE))
-
-    if has_critical_header and not is_false_alarm:
+    if has_critical_header and not critical_section_is_empty(review_text):
         print("\n[!] CRITICAL ISSUES DETECTED. Marking job as FAILED.")
         sys.exit(1)
     else:
