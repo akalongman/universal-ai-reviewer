@@ -84,9 +84,13 @@ class OpenAIReviewer(AIProvider):
 
 
 def get_provider(provider_name):
+    if provider_name == "anthropic":
+        return AnthropicReviewer()
     if provider_name == "gemini":
         return GeminiReviewer()
-    elif provider_name == "openai":  # <-- New
+    if provider_name == "openai":
         return OpenAIReviewer()
-
-    return AnthropicReviewer()
+    raise ValueError(
+        f"Unsupported AI_PROVIDER: {provider_name!r}. "
+        "Expected one of: anthropic, gemini, openai."
+    )

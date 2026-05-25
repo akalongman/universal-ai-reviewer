@@ -3,6 +3,7 @@ import sys
 
 
 _TRUTHY = {"true", "1", "yes"}
+_KNOWN_PROVIDERS = ("anthropic", "gemini", "openai")
 
 
 def _env_bool(name: str) -> bool:
@@ -103,7 +104,18 @@ class Config:
         """Ensures the environment is fully equipped before starting."""
         missing = []
 
-        # Validate AI Provider
+        # Validate AI Provider name itself. Catches the bypass path where the
+        # user sets AI_PROVIDER=<unknown> AND AI_MODEL=<anything>, which would
+        # otherwise sail through __init__'s model picker and surface downstream
+        # as a confusing SDK error.
+        if self.provider not in _KNOWN_PROVIDERS:
+            print(
+                f"Error: Unsupported AI_PROVIDER {self.provider!r}. "
+                f"Expected one of: {', '.join(_KNOWN_PROVIDERS)}."
+            )
+            sys.exit(1)
+
+        # Validate AI Provider API key
         if self.provider == "anthropic" and not self.anthropic_api_key:
             missing.append("ANTHROPIC_API_KEY")
         elif self.provider == "gemini" and not self.gemini_api_key:
@@ -141,14 +153,13 @@ class Config:
     def active_api_key(self):
         """Return the API key for the configured AI provider.
 
-        Centralised here so orchestration code never has to know which provider name
-        maps to which key attribute. Returns None for unknown providers; validation
-        in `_validate` already prevents that path at runtime.
+        Centralised here so orchestration code never has to know which provider
+        name maps to which key attribute. `_validate` rejects unknown providers
+        at Config init, so by the time this property runs `self.provider` is
+        guaranteed to be one of the three known values.
         """
         if self.provider == "anthropic":
             return self.anthropic_api_key
         if self.provider == "gemini":
             return self.gemini_api_key
-        if self.provider == "openai":
-            return self.openai_api_key
-        return None
+        return self.openai_api_key

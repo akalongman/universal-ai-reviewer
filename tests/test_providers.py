@@ -1,6 +1,30 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from reviewer.llm_providers import AnthropicReviewer, GeminiReviewer, OpenAIReviewer
+from reviewer.llm_providers import (
+    AnthropicReviewer,
+    GeminiReviewer,
+    OpenAIReviewer,
+    get_provider,
+)
+
+
+def test_get_provider_returns_correct_class_for_each_known_name():
+    assert isinstance(get_provider("anthropic"), AnthropicReviewer)
+    assert isinstance(get_provider("gemini"), GeminiReviewer)
+    assert isinstance(get_provider("openai"), OpenAIReviewer)
+
+
+def test_get_provider_raises_for_unknown_name():
+    """Defense in depth: even if Config validation is bypassed (in tests or
+    future refactors), the factory itself rejects unknown providers instead
+    of silently returning an AnthropicReviewer that fails with a misleading
+    SDK error downstream."""
+    with pytest.raises(ValueError) as exc_info:
+        get_provider("ollama")
+    assert "ollama" in str(exc_info.value)
+    assert "anthropic" in str(exc_info.value)
+    assert "gemini" in str(exc_info.value)
+    assert "openai" in str(exc_info.value)
 
 @patch('reviewer.llm_providers.Anthropic')
 def test_anthropic_reviewer_stream_parsing(mock_anthropic_class):

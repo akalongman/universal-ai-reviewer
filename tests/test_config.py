@@ -96,15 +96,19 @@ def test_active_api_key_returns_gemini_when_selected(base_env, monkeypatch):
 
 
 def test_unknown_provider_without_model_fails_fast(base_env, monkeypatch):
+    """Unknown provider without AI_MODEL fails at the model-picker step in __init__."""
     monkeypatch.setenv("AI_PROVIDER", "ollama")
     monkeypatch.delenv("AI_MODEL", raising=False)
     with pytest.raises(SystemExit):
         Config()
 
 
-def test_unknown_provider_with_explicit_model_is_allowed_at_model_step(base_env, monkeypatch):
-    """Setting AI_MODEL explicitly lets a custom provider name through the model picker;
-    the run still fails at api-key validation, which is the correct place."""
+def test_unknown_provider_with_explicit_model_fails_at_validation(base_env, monkeypatch):
+    """Bypass guard: setting AI_MODEL skips the init-time check, but _validate
+    catches unknown providers as a second line of defence. Without this guard,
+    the run would silently use the Anthropic SDK (via get_provider's old fallback)
+    and surface a confusing 401 instead of 'unknown provider'."""
     monkeypatch.setenv("AI_PROVIDER", "ollama")
     monkeypatch.setenv("AI_MODEL", "llama3")
-    Config()
+    with pytest.raises(SystemExit):
+        Config()
