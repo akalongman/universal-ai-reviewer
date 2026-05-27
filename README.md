@@ -62,9 +62,25 @@ stages:
 
 ---
 
+## 🛡️ How the Gatekeeper Decides
+
+The CI pass/fail decision is driven by a single line the model writes at the top of every response, called the **severity directive**:
+
+```
+<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->
+```
+
+The directive is an HTML comment, so it does not render in PR/MR viewers but is trivially parseable. The gatekeeper exits 1 when `critical > 0` and exits 0 otherwise. The markdown body that follows is for human reviewers; the gatekeeper does not read it.
+
+**Dual-read window (1.2.x).** Responses without the directive fall back to the legacy prose-parsing heuristic (looking for a `🔴 Critical Issues` section and checking whether its body is a negation phrase). A `DEPRECATION` notice is logged when this fallback fires. Prose parsing is scheduled for removal in 2.0; consumers should upgrade their system prompts before then.
+
+**Conflict policy.** If the directive reports `critical=0` but the body contains a `🔴 Critical Issues` header, the gatekeeper trusts the directive (logs a `WARNING`). Calling the directive authoritative is the only rule consistent with the design.
+
+**Fail-closed on malformed directive.** If the directive line is present but cannot be parsed (missing required keys, non-integer values, negative counts, duplicate directives), the gatekeeper fails the build with a descriptive error. The reasoning is that a model that attempted to signal severity but failed is a stronger smell than a model that omitted the signal entirely.
+
 ## 🚦 Allowing Merges on AI Failure (Soft Fails)
 
-By default, this tool acts as a strict gatekeeper: if it detects `🔴 Critical Issues`, it will fail the CI job and block the Merge/Pull Request. 
+By default, this tool acts as a strict gatekeeper: the CI job fails when the severity directive reports `critical > 0` (or, during the dual-read window, when prose parsing detects an actual critical-issues section). 
 
 If you want the AI to only act as an advisor (failing the job with a warning, but still allowing developers to merge their code), you should use your platform's native "Soft Fail" flags:
 

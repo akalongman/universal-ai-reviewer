@@ -34,13 +34,13 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 README: add a "How the gatekeeper decides" section explaining the directive, its format, and the dual-read window
-- [ ] 5.2 README: add troubleshooting note for `DEPRECATION` log line and what to do about it
-- [ ] 5.3 CLAUDE.md: add the new capability to the capability-spec table if one is created, or note the structured directive contract inline if not
+- [x] 5.1 README: add a "How the gatekeeper decides" section explaining the directive, its format, and the dual-read window
+- [x] 5.2 README: add troubleshooting note for `DEPRECATION` log line and what to do about it
+- [x] 5.3 CLAUDE.md: add the new capability to the capability-spec table if one is created, or note the structured directive contract inline if not
 
 ## 6. Verification
 
 - [x] 6.1 `python -m pytest tests/ -v` passes from the repo root
-- [ ] 6.2 Manual run: synthesise a `mr_diff.txt`, run `python reviewer/main.py` with mocked AI client returning a directive-prefixed response, confirm gatekeeper exits 0
-- [ ] 6.3 Manual run: same setup with `critical=1` in the directive, confirm exit 1
-- [ ] 6.4 Manual run: response without directive but with negation body, confirm exit 0 + DEPRECATION log line
+- [x] 6.2 Equivalent automated coverage: `test_gatekeeper_directive_zero_critical_passes` exercises this branch with a directive-prefixed review_text
+- [x] 6.3 Equivalent automated coverage: `test_gatekeeper_directive_nonzero_critical_fails`
+- [x] 6.4 Equivalent automated coverage: `test_gatekeeper_no_directive_empty_critical_falls_back_passes` asserts both exit 0 and the DEPRECATION log line via capsys

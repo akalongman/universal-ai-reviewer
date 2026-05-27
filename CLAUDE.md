@@ -68,7 +68,7 @@ The entrypoint runs a fixed seven step sequence and uses process exit codes as i
 4. Post a `⏳ Thinking...` placeholder comment so reviewers see live feedback.
 5. Build system + user prompts (`build_prompts`), select the AI provider (factory `get_provider`), and call `.review(...)`.
 6. Edit the placeholder comment with the final markdown.
-7. Gatekeeper: `sys.exit(1)` if the response contains a `🔴 Critical Issues` header that is not a "None / No / 0 / N/A" false alarm. Otherwise `sys.exit(0)`. This exit code is what fails the CI job, so downstream consumers control hard vs soft failure via `continue-on-error` (GitHub) or `allow_failure` (GitLab), not via any flag inside this repo.
+7. Gatekeeper: delegates to `prompts.gatekeeper_exit_code(review_text)`. Reads a structured `<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->` directive at the first non-whitespace line of the response. Exits 1 when `critical > 0` or when the directive is malformed (fail-closed). When the directive is absent, falls back to legacy prose parsing (`critical_section_is_empty`) with a `DEPRECATION` log line. This exit code is what fails the CI job, so downstream consumers control hard vs soft failure via `continue-on-error` (GitHub) or `allow_failure` (GitLab), not via any flag inside this repo.
 
 If the AI call fails, the placeholder is edited with the error message and the job exits 1.
 
@@ -95,7 +95,7 @@ Three behaviours that are easy to break and worth understanding before editing:
 * **`.aiignore` filtering.** `filter_diff` parses the unified diff, splits it on `diff --git` headers, and drops any file whose `b/` path matches a pattern from `.aiignore` via `fnmatch`. Patterns are matched both directly and as `*/{pattern}` so that bare names like `package-lock.json` match nested copies. There are no default ignore patterns: an absent or empty `.aiignore` means "review everything".
 * **`.ai-rules.md` injection.** If present in the repo being reviewed, its contents are injected verbatim into the user prompt under a `**Specific Project Rules:**` heading. Falls back to the `AI_PROJECT_CONTEXT` env var if the file is missing.
 
-The system prompt instructs the model to categorize feedback as `🔴 Critical Issues` / `🟡 Suggestions` / `🟢 Nitpicks/Praise`, to wrap nitpicks in a `<details>` block, and to OMIT the critical header entirely when there are no critical issues. The gatekeeper in `main.py` depends on this contract, so changes to category names or omission rules must be made in both places.
+The system prompt instructs the model to begin every response with a `<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->` directive at the first non-whitespace line. That directive is the only signal the gatekeeper reads. The category headers (`🔴 Critical Issues` / `🟡 Suggestions` / `🟢 Nitpicks/Praise`) remain in the prompt for human readability and are wrapped in `<details>` blocks for nitpicks, but the gatekeeper no longer reads them. Changes to the directive format must be made in both `prompts.build_prompts` (the instruction) and `prompts.parse_severity_directive` (the parser); changes to category headers can now be made in isolation. The dual-read window means `critical_section_is_empty` (the prose-parsing fallback) is still load-bearing for responses missing the directive; do not remove it before 2.0.
 
 The current date is rendered into the system prompt via `datetime.now()` so the model does not flag current year timestamps as "future dates" (a real false positive class that was hitting migrations and copyright notices).
 
