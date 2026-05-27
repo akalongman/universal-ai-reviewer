@@ -388,9 +388,13 @@ def test_gatekeeper_directive_only_with_critical_fails(capsys):
     # parser must see through that wrapping instead of silently falling back
     # to prose parsing (which would log a misleading DEPRECATION notice for
     # a model that DID emit a directive, just in the wrong syntactic position).
+    # Both CommonMark fence types (backticks and tildes) are accepted.
     "```\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n```\n### body",
     "```html\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n```\n",
     "````\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n````\n",
+    "~~~\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n~~~\n",
+    "~~~html\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n~~~\n",
+    "~~~~\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n~~~~\n",
 ])
 def test_parse_severity_directive_unwraps_code_fence(text):
     assert parse_severity_directive(text) == {"critical": 0, "suggestions": 0, "nitpicks": 0}

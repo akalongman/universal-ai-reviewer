@@ -42,12 +42,13 @@ class DirectiveParseError(ValueError):
 
 _REQUIRED_DIRECTIVE_KEYS = ("critical", "suggestions", "nitpicks")
 # Match the directive at the start of the response, optionally preceded by a
-# leading markdown code fence (some models wrap raw HTML in ```...``` out of
-# habit; without this, the wrapped directive would silently fall back to
-# prose parsing). The fence-language part uses [^\n] explicitly because
-# re.DOTALL would otherwise let it consume past the fence end.
+# leading markdown code fence (some models wrap raw HTML in ```...``` or
+# ~~~...~~~ out of habit; without this, the wrapped directive would silently
+# fall back to prose parsing). Both CommonMark fence types are accepted. The
+# fence-language part uses [^\n] explicitly because re.DOTALL would otherwise
+# let it consume past the fence end.
 _DIRECTIVE_PREFIX_RE = re.compile(
-    r"\A\s*(?:`{3,}[^\n]*\n)?\s*<!--\s*(.*?)\s*-->", re.DOTALL
+    r"\A\s*(?:(?:`{3,}|~{3,})[^\n]*\n)?\s*<!--\s*(.*?)\s*-->", re.DOTALL
 )
 _ANY_DIRECTIVE_COMMENT_RE = re.compile(r"<!--\s*(.*?)\s*-->", re.DOTALL)
 # Match `🔴 Critical Issues` only when it appears at the start of a line,

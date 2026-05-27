@@ -12,6 +12,10 @@ The directive format MUST be exactly:
 
 where each `N` is a non-negative integer. The keys `critical`, `suggestions`, `nitpicks` MUST all be present. Additional keys MAY be ignored by the parser. The directive MUST occupy the first non-whitespace line of the response.
 
+The parser SHALL accept the directive prefix (`ai-review:`) and the key names case-insensitively (`AI-REVIEW:`, `Critical=N`, etc. are all valid). This leniency exists because models frequently capitalize tokens in ways that are immaterial to the semantic content. Values (the integers themselves) are case-irrelevant. The system prompt always shows the canonical lowercase form so well-behaved models emit it that way; case-insensitivity is for graceful degradation, not encouragement.
+
+The parser SHALL also accept the directive when it is wrapped inside a leading markdown code fence (` ``` ` or `~~~`). Some models wrap raw HTML in fences out of habit; without this leniency, those responses would silently fall back to legacy prose parsing despite the model having emitted a valid directive.
+
 The system prompt MUST also tell the model that the legacy category headers (`🔴 Critical Issues`, `🟡 Suggestions`, `🟢 Nitpicks/Praise`) are retained for human readability but are no longer the gatekeeper's signal source.
 
 #### Scenario: Model emits directive with zero critical
