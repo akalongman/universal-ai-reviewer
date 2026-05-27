@@ -45,13 +45,13 @@ GitLab users can include this template directly from GitHub. The template automa
 
 ```yaml
 include:
-  - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/1.2.0/gitlab-template.yml'
+  - remote: 'https://raw.githubusercontent.com/akalongman/universal-ai-reviewer/1.4.0/gitlab-template.yml'
 
 variables:
   # Pin the cloned reviewer code to the same ref as the template you include above.
   # Defaults to "main" if unset, which can drift away from the pinned template.
   # AI_REVIEWER_REF is only honored by template versions 1.2.0 and later.
-  AI_REVIEWER_REF: "1.2.0"
+  AI_REVIEWER_REF: "1.4.0"
 
 # Ensure you have a 'review' stage defined
 stages:
