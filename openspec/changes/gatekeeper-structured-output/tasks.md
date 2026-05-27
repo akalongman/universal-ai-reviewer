@@ -1,9 +1,9 @@
-## 0. Design decisions (must be resolved before any code is written)
+## 0. Design decisions (resolved)
 
-- [ ] 0.1 Confirm directive format: HTML comment `<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->` vs. JSON code block vs. YAML frontmatter
-- [ ] 0.2 Confirm position: first line vs. last line vs. anywhere
-- [ ] 0.3 Confirm backward-compat policy: dual-read in 1.x with prose fallback, hard-cut at 2.0
-- [ ] 0.4 Confirm conflict policy: directive wins, log warning on disagreement
+- [x] 0.1 Directive format: **HTML comment** `<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->`. Chosen over JSON code block (visible noise in rendered review) and YAML frontmatter (unusual mid-document, conflicts with possible existing frontmatter).
+- [x] 0.2 Position: **first non-whitespace line of the response**. O(1) parse, easy to validate model compliance, prominent enough that a malformed directive is visible to humans during early adoption.
+- [x] 0.3 Backward-compat: **dual-read in 1.x, hard-cut at 2.0**. When the directive is absent, gatekeeper falls back to `critical_section_is_empty` and logs a one-line DEPRECATION notice. Removes the prose-parsing path entirely at the next major.
+- [x] 0.4 Conflict policy: **directive wins**, with a WARNING log when the body contains a `🔴 Critical Issues` header but the directive reports `critical=0`. Trusting the directive is consistent with calling it authoritative; the log preserves auditability.
 
 ## 1. System prompt update
 
@@ -16,7 +16,7 @@
 - [ ] 2.1 Implement `parse_severity_directive(review_text: str) -> dict | None` in `reviewer/prompts.py` (or new `reviewer/gatekeeper.py` if it grows)
 - [ ] 2.2 Parser MUST return `None` when no directive is present (signals "fall back to legacy prose parsing")
 - [ ] 2.3 Parser MUST raise `DirectiveParseError` on malformed directive (signals "fail-closed, this is suspicious")
-- [ ] 2.4 Parser tests: valid directive, missing keys default to 0, extra keys ignored, malformed value, multiple directives (last wins or error — decision needed)
+- [ ] 2.4 Parser tests: valid directive, missing keys default to 0, extra keys ignored, malformed value, multiple directives (parser raises `DirectiveParseError` — multiple directives signal model confusion and the fail-closed posture treats this as suspicious)
 
 ## 3. Gatekeeper rewrite
 

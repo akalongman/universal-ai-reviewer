@@ -18,16 +18,17 @@ The structural fix is to stop parsing prose. Have the model emit a single parsea
 - **NEW** parser in `reviewer/prompts.py` (or a new `reviewer/gatekeeper.py`) for the structured directive. Strict parsing: malformed = fail-closed (CI exits 1 with a clear error pointing at the offending line).
 - **TEST** suite: parser tests for valid forms, malformed forms, missing directive, conflicting directive (counter says 0 but body has a `🔴` header).
 
-## Decisions to be made before writing tasks
+## Design decisions (resolved)
 
-Four design questions where I'm proposing defaults but defer to your call:
+All four design questions resolved against the originally-proposed defaults. Rationale and rejected alternatives recorded inline so future readers do not have to reconstruct the reasoning.
 
-| Decision | Proposal | Alternative |
+| Decision | Resolved | Rationale |
 |---|---|---|
-| Directive format | HTML comment with key=value: `<!-- ai-review: critical=0; suggestions=2; nitpicks=1 -->` | JSON code block (visible to humans) or YAML frontmatter (unusual in markdown) |
-| Position | First line of the response, before any rendered content | Last line (less prominent), or anywhere (more parsing work) |
-| Backward compatibility | Dual-read in 1.x: prefer the directive when present, fall back to `critical_section_is_empty` when absent. Remove the fallback in 2.0. | Hard-cut at 1.2.0: directive missing = fail-closed |
-| Conflict resolution | Directive wins. Log warning if directive says 0 but body contains `🔴 Critical Issues`. | Body wins. Or fail-closed on conflict. |
+| Directive format | HTML comment: `<!-- ai-review: critical=0; suggestions=2; nitpicks=1 -->` | Only format that is invisible in rendered markdown while remaining trivially parseable. JSON code blocks render as visible noise; YAML frontmatter is unusual mid-document and could collide with downstream tooling that strips frontmatter. |
+| Position | First non-whitespace line of the response | O(1) parse cost. Malformed or missing directive is immediately visible to humans during the dual-read window, making early-adoption issues easy to debug. |
+| Backward compatibility | Dual-read in 1.x, hard-cut at 2.0 | A hard-cut at 1.2.0 would fail every consumer whose prompt template lags one release. Dual-read with a DEPRECATION log line gives operators a clear migration signal without breaking them. The 2.0 cut is the right place to remove the prose-parsing path entirely. |
+| Conflict resolution | Directive wins; WARNING logged when body has a `🔴 Critical Issues` header but directive says `critical=0` | Trusting the directive is the only rule consistent with calling the directive authoritative. The log preserves audit trail so the disagreement can be investigated without affecting CI outcome. Fail-closed on conflict would defeat the dual-read transition. |
+| Multiple directives (sub-decision in task 2.4) | Parser raises `DirectiveParseError` | A response containing two directive lines signals model confusion or attempted manipulation. The fail-closed posture treats this as suspicious and surfaces an explicit error rather than picking one. |
 
 ## Capabilities
 
