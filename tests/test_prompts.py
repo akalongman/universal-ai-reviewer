@@ -363,3 +363,81 @@ def test_gatekeeper_no_directive_no_critical_header_passes(capsys):
     out = capsys.readouterr().out
     assert "DEPRECATION" in out
     assert "PASSED" in out
+
+
+def test_gatekeeper_directive_only_no_body_passes(capsys):
+    """Edge case: model emits only the directive with no body at all. The
+    directive is authoritative, so critical=0 → pass."""
+    text = "<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->"
+    assert gatekeeper_exit_code(text) == 0
+    out = capsys.readouterr().out
+    assert "PASSED" in out
+
+
+def test_gatekeeper_directive_only_with_critical_fails(capsys):
+    """Edge case: directive reports critical findings, body is missing.
+    Directive is authoritative even without a body."""
+    text = "<!-- ai-review: critical=2; suggestions=0; nitpicks=0 -->"
+    assert gatekeeper_exit_code(text) == 1
+    out = capsys.readouterr().out
+    assert "2 CRITICAL" in out
+
+
+@pytest.mark.parametrize("text", [
+    # Some models wrap raw HTML in markdown code fences out of habit. The
+    # parser must see through that wrapping instead of silently falling back
+    # to prose parsing (which would log a misleading DEPRECATION notice for
+    # a model that DID emit a directive, just in the wrong syntactic position).
+    "```\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n```\n### body",
+    "```html\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n```\n",
+    "````\n<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n````\n",
+])
+def test_parse_severity_directive_unwraps_code_fence(text):
+    assert parse_severity_directive(text) == {"critical": 0, "suggestions": 0, "nitpicks": 0}
+
+
+def test_gatekeeper_conflict_warning_does_not_fire_on_substring_mention(capsys):
+    """Regression: the conflict-WARNING log should fire only when the body has
+    an actual 🔴 Critical Issues header, not when a Suggestions or Nitpicks
+    section happens to mention the string '🔴 Critical Issues' inline."""
+    text = (
+        "<!-- ai-review: critical=0; suggestions=1; nitpicks=0 -->\n"
+        "### 🟡 Suggestions\n"
+        "- The 🔴 Critical Issues category requires bold formatting.\n"
+    )
+    assert gatekeeper_exit_code(text) == 0
+    out = capsys.readouterr().out
+    assert "WARNING" not in out
+    assert "PASSED" in out
+
+
+def test_gatekeeper_conflict_warning_does_fire_on_real_header(capsys):
+    """Inverse of the above: a genuine header at the start of a line must
+    still trigger the WARNING."""
+    text = (
+        "<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n"
+        "### 🔴 Critical Issues\n"
+        "- SQL injection at users.py:42\n"
+    )
+    assert gatekeeper_exit_code(text) == 0  # directive wins, build passes
+    out = capsys.readouterr().out
+    assert "WARNING" in out
+    assert "Trusting the directive" in out
+
+
+def test_system_prompt_example_response_is_a_parseable_directive():
+    """Regression guard: the example response embedded in the system prompt
+    ('If flawless, reply exactly: <directive> + heading') must itself parse
+    cleanly. A typo or formatting change to the example that broke parsing
+    would silently degrade the model's ability to comply."""
+    system_prompt, _ = build_prompts("+ diff", "Title", "Desc", "")
+    assert "<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->" in system_prompt
+    # Simulate a model copying the example verbatim, including the indent the
+    # prompt shows it with. The parser must accept that form.
+    hypothetical_reply = (
+        "   <!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n"
+        "   ### Looks good to me! 🚀 No issues found."
+    )
+    assert parse_severity_directive(hypothetical_reply) == {
+        "critical": 0, "suggestions": 0, "nitpicks": 0,
+    }

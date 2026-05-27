@@ -28,7 +28,7 @@ The exit code contract is preserved verbatim: 0 = no critical issues, 1 = critic
 
 #### Scenario: Directive malformed
 - **WHEN** the response begins with `<!-- ai-review: critical=oops -->` or omits required keys
-- **THEN** the gatekeeper exits 1 AND logs `ERROR: AI response contained a malformed severity directive: <line>. Treating as critical-issues-detected.`
+- **THEN** the gatekeeper exits 1 AND logs `ERROR: AI response contained a malformed severity directive: <description-of-defect> Marking job as FAILED (fail-closed).` where `<description-of-defect>` names the specific problem (e.g. "Malformed ai-review directive value: critical='oops'. Expected a non-negative integer.")
 
 #### Scenario: Directive conflicts with body
 - **WHEN** the directive says `critical=0` but the body contains a `🔴 Critical Issues` header

@@ -41,8 +41,20 @@ class DirectiveParseError(ValueError):
 
 
 _REQUIRED_DIRECTIVE_KEYS = ("critical", "suggestions", "nitpicks")
-_DIRECTIVE_PREFIX_RE = re.compile(r"\A\s*<!--\s*(.*?)\s*-->", re.DOTALL)
+# Match the directive at the start of the response, optionally preceded by a
+# leading markdown code fence (some models wrap raw HTML in ```...``` out of
+# habit; without this, the wrapped directive would silently fall back to
+# prose parsing). The fence-language part uses [^\n] explicitly because
+# re.DOTALL would otherwise let it consume past the fence end.
+_DIRECTIVE_PREFIX_RE = re.compile(
+    r"\A\s*(?:`{3,}[^\n]*\n)?\s*<!--\s*(.*?)\s*-->", re.DOTALL
+)
 _ANY_DIRECTIVE_COMMENT_RE = re.compile(r"<!--\s*(.*?)\s*-->", re.DOTALL)
+# Match `🔴 Critical Issues` only when it appears at the start of a line,
+# optionally preceded by markdown heading hashes. Used by the conflict-warning
+# check so that mid-prose mentions of the string (e.g. inside a Suggestions
+# bullet) do not trigger the warning.
+_CRITICAL_HEADER_RE = re.compile(r"^\s*(?:#{1,6}\s+)?🔴 Critical Issues", re.MULTILINE)
 
 
 def parse_severity_directive(review_text):
@@ -149,7 +161,7 @@ def gatekeeper_exit_code(review_text):
             f"Severity directive: critical={critical}, "
             f"suggestions={suggestions}, nitpicks={nitpicks}"
         )
-        if critical == 0 and "🔴 Critical Issues" in review_text:
+        if critical == 0 and _CRITICAL_HEADER_RE.search(review_text):
             print(
                 "WARNING: directive says critical=0 but body contains a "
                 "'🔴 Critical Issues' header. Trusting the directive."
