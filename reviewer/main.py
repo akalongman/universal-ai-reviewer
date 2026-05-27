@@ -6,7 +6,7 @@ from prompts import (
     get_custom_rules,
     build_prompts,
     get_ignore_patterns,
-    critical_section_is_empty,
+    gatekeeper_exit_code,
 )
 from llm_providers import get_provider
 from context_fetcher import ContextFetcher, check_context_window
@@ -108,14 +108,8 @@ def main():
         sys.exit(1)
 
     # 8. Status Gatekeeper
-    has_critical_header = "🔴 Critical Issues" in review_text
-
-    if has_critical_header and not critical_section_is_empty(review_text):
-        print("\n[!] CRITICAL ISSUES DETECTED. Marking job as FAILED.")
-        sys.exit(1)
-    else:
-        print("\n[✓] No critical issues found. Marking job as PASSED.")
-        sys.exit(0)
+    print()
+    sys.exit(gatekeeper_exit_code(review_text))
 
 if __name__ == "__main__":
     main()

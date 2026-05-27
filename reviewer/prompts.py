@@ -29,6 +29,150 @@ _ALLOWED_EMPTY_TOKENS = {
 _MARKDOWN_NOISE_RE = re.compile(r"[\s\-\*>_`:.()\[\]!]+")
 
 
+class DirectiveParseError(ValueError):
+    """The AI response contained an ai-review directive that could not be parsed.
+
+    Raised when an ai-review directive is present at the start of the response
+    but is malformed (missing required keys, non-integer values, negative
+    counts) or appears more than once. The gatekeeper treats this as
+    fail-closed: the model attempted to signal severity but failed, which is
+    a stronger smell than the directive being absent altogether.
+    """
+
+
+_REQUIRED_DIRECTIVE_KEYS = ("critical", "suggestions", "nitpicks")
+_DIRECTIVE_PREFIX_RE = re.compile(r"\A\s*<!--\s*(.*?)\s*-->", re.DOTALL)
+_ANY_DIRECTIVE_COMMENT_RE = re.compile(r"<!--\s*(.*?)\s*-->", re.DOTALL)
+
+
+def parse_severity_directive(review_text):
+    """Parse the leading ai-review directive from an AI response.
+
+    Returns:
+        A dict with int values for at least the three required keys
+        (`critical`, `suggestions`, `nitpicks`) when a valid directive is
+        present at the start of the response.
+
+        None when the response does not start with an HTML comment, or starts
+        with an HTML comment that is not an ai-review directive. This is the
+        signal for the gatekeeper to fall back to legacy prose parsing.
+
+    Raises:
+        DirectiveParseError when a directive is present but malformed, or
+        when more than one ai-review directive appears anywhere in the body.
+    """
+    if not isinstance(review_text, str):
+        return None
+    first_match = _DIRECTIVE_PREFIX_RE.match(review_text)
+    if not first_match:
+        return None
+    content = first_match.group(1).strip()
+    if not content.lower().startswith("ai-review:"):
+        return None
+
+    # Detect a second ai-review directive anywhere in the response. Two
+    # directives signal model confusion (or attempted manipulation); the
+    # fail-closed posture treats this as suspicious rather than picking one.
+    for extra in _ANY_DIRECTIVE_COMMENT_RE.finditer(review_text, first_match.end()):
+        extra_content = extra.group(1).strip().lower()
+        if extra_content.startswith("ai-review:"):
+            raise DirectiveParseError(
+                "Response contained more than one ai-review directive; only one is permitted."
+            )
+
+    payload = content[len("ai-review:"):].strip()
+    if not payload:
+        raise DirectiveParseError("Empty ai-review directive payload; expected key=value pairs.")
+
+    parsed = {}
+    for pair in payload.split(";"):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise DirectiveParseError(
+                f"Malformed ai-review directive segment {pair!r}; expected key=value."
+            )
+        key, value = pair.split("=", 1)
+        key = key.strip().lower()
+        value = value.strip()
+        try:
+            count = int(value)
+        except ValueError:
+            raise DirectiveParseError(
+                f"Malformed ai-review directive value: {key}={value!r}. "
+                "Expected a non-negative integer."
+            )
+        if count < 0:
+            raise DirectiveParseError(
+                f"Negative count in ai-review directive: {key}={count}."
+            )
+        parsed[key] = count
+
+    missing = [k for k in _REQUIRED_DIRECTIVE_KEYS if k not in parsed]
+    if missing:
+        raise DirectiveParseError(
+            f"ai-review directive missing required key(s): {', '.join(missing)}. "
+            f"Got keys: {sorted(parsed)}."
+        )
+    return parsed
+
+
+def gatekeeper_exit_code(review_text):
+    """Decide the CI exit code from the AI response.
+
+    Returns 0 (pass) or 1 (fail). Pure function: only side effect is print
+    statements that surface in CI logs. Called by `main.py` which translates
+    the return value into `sys.exit`.
+
+    Decision precedence:
+    1. Malformed directive → 1 (fail-closed; model attempted to signal but failed)
+    2. Valid directive with `critical > 0` → 1
+    3. Valid directive with `critical == 0` → 0 (warns if body has 🔴 header)
+    4. No directive, prose says non-empty critical section → 1 (with DEPRECATION log)
+    5. No directive, prose says empty critical section → 0 (with DEPRECATION log)
+    """
+    try:
+        directive = parse_severity_directive(review_text)
+    except DirectiveParseError as exc:
+        print(
+            f"ERROR: AI response contained a malformed severity directive: {exc} "
+            "Marking job as FAILED (fail-closed)."
+        )
+        return 1
+
+    if directive is not None:
+        critical = directive["critical"]
+        suggestions = directive["suggestions"]
+        nitpicks = directive["nitpicks"]
+        print(
+            f"Severity directive: critical={critical}, "
+            f"suggestions={suggestions}, nitpicks={nitpicks}"
+        )
+        if critical == 0 and "🔴 Critical Issues" in review_text:
+            print(
+                "WARNING: directive says critical=0 but body contains a "
+                "'🔴 Critical Issues' header. Trusting the directive."
+            )
+        if critical > 0:
+            print(f"[!] {critical} CRITICAL ISSUE(S) DETECTED. Marking job as FAILED.")
+            return 1
+        print("[✓] No critical issues found. Marking job as PASSED.")
+        return 0
+
+    print(
+        "DEPRECATION: AI response did not include a severity directive; "
+        "falling back to prose parsing. Upgrade the system prompt (>=1.2.0) "
+        "to emit '<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->' "
+        "as the first line. Prose parsing will be removed in 2.0."
+    )
+    if "🔴 Critical Issues" in review_text and not critical_section_is_empty(review_text):
+        print("[!] CRITICAL ISSUES DETECTED. Marking job as FAILED.")
+        return 1
+    print("[✓] No critical issues found. Marking job as PASSED.")
+    return 0
+
+
 def critical_section_is_empty(review_text: str) -> bool:
     """Return True when the AI wrote a 🔴 Critical Issues header but its body is purely negation.
 
@@ -206,17 +350,28 @@ def build_prompts(diff, mr_title, mr_description, custom_rules, fetched_files=No
 
         CRITICAL CONTEXT: Today's date is {current_date}. Do not flag timestamps, migration files, or copyright notices as "future dates" if they match the current year.
 
-        Guidelines:
-        1. Categorize feedback into: 🔴 Critical Issues, 🟡 Suggestions, and 🟢 Nitpicks/Praise.
-            **CRITICAL INSTRUCTION:** If there are no critical issues, you MUST COMPLETELY OMIT the "🔴 Critical Issues" header. Do not write "None" or "N/A".
+        CI GATEKEEPER DIRECTIVE (MOST IMPORTANT, READ THIS FIRST):
+        Every response MUST begin with this exact line, with accurate counts:
+        <!-- ai-review: critical=N; suggestions=N; nitpicks=N -->
+        - All three keys MUST be present and MUST be non-negative integers.
+        - This directive is the ONLY signal the CI gatekeeper reads to decide pass/fail.
+        - The markdown body below the directive is for human reviewers; the gatekeeper does not parse it.
+        - If you omit, duplicate, or malform this directive, the CI job fails.
+
+        Guidelines for the body that follows the directive:
+        1. Categorize feedback into: 🔴 Critical Issues, 🟡 Suggestions, 🟢 Nitpicks/Praise.
+           These headers exist for human readability; the gatekeeper does not read them.
+           Match the section counts to the directive's `critical`, `suggestions`, `nitpicks` values respectively.
         2. CLEANLINESS RULE: You MUST wrap all "🟢 Nitpicks/Praise" inside a Markdown collapsible block:
            <details><summary><b>🟢 Nitpicks & Praise</b></summary>
            (Your nitpicks here)
            </details>
         3. IMPORTANT: Do not complain about missing imports or variables if they might be defined elsewhere in the file (you only see a diff).
         4. Provide code fixes using GitLab/GitHub suggestion syntax: ```suggestion ... ``` when possible.
-        5. Provide strictly Markdown. No greetings or preambles.
-        6. If flawless, reply: "### Looks good to me! 🚀 No issues found."{full_file_note}
+        5. Provide strictly Markdown. No greetings or preambles between the directive and the first section.
+        6. If flawless, reply exactly:
+           <!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->
+           ### Looks good to me! 🚀 No issues found.{full_file_note}
     """).strip()
 
     user_prompt = textwrap.dedent(f"""

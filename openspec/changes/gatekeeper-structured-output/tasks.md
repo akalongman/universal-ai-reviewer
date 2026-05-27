@@ -7,30 +7,30 @@
 
 ## 1. System prompt update
 
-- [ ] 1.1 Add directive instruction to `prompts.build_prompts` system context. The instruction MUST specify exact format, position, and that this is the only authoritative gatekeeper signal
-- [ ] 1.2 Preserve existing category-header guidance (`🔴`, `🟡`, `🟢`) for human readability, but explicitly tell the model the gatekeeper no longer reads these headers
-- [ ] 1.3 Update the "If flawless" example response to include the directive (e.g. `<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n### Looks good to me!`)
+- [x] 1.1 Add directive instruction to `prompts.build_prompts` system context. The instruction MUST specify exact format, position, and that this is the only authoritative gatekeeper signal
+- [x] 1.2 Preserve existing category-header guidance (`🔴`, `🟡`, `🟢`) for human readability, but explicitly tell the model the gatekeeper no longer reads these headers
+- [x] 1.3 Update the "If flawless" example response to include the directive (e.g. `<!-- ai-review: critical=0; suggestions=0; nitpicks=0 -->\n### Looks good to me!`)
 
 ## 2. Parser
 
-- [ ] 2.1 Implement `parse_severity_directive(review_text: str) -> dict | None` in `reviewer/prompts.py` (or new `reviewer/gatekeeper.py` if it grows)
-- [ ] 2.2 Parser MUST return `None` when no directive is present (signals "fall back to legacy prose parsing")
-- [ ] 2.3 Parser MUST raise `DirectiveParseError` on malformed directive (signals "fail-closed, this is suspicious")
-- [ ] 2.4 Parser tests: valid directive, missing keys default to 0, extra keys ignored, malformed value, multiple directives (parser raises `DirectiveParseError` — multiple directives signal model confusion and the fail-closed posture treats this as suspicious)
+- [x] 2.1 Implement `parse_severity_directive(review_text: str) -> dict | None` in `reviewer/prompts.py` (or new `reviewer/gatekeeper.py` if it grows)
+- [x] 2.2 Parser MUST return `None` when no directive is present (signals "fall back to legacy prose parsing")
+- [x] 2.3 Parser MUST raise `DirectiveParseError` on malformed directive (signals "fail-closed, this is suspicious")
+- [x] 2.4 Parser tests: valid directive, missing required keys (`critical`/`suggestions`/`nitpicks`) raises DirectiveParseError (the spec requires all three; "default to 0" was a draft hangover that contradicted the spec and was discarded), extra keys ignored, malformed value, negative count, multiple directives → DirectiveParseError
 
 ## 3. Gatekeeper rewrite
 
-- [ ] 3.1 In `reviewer/main.py`, restructure the gatekeeper block: try `parse_severity_directive` first
-- [ ] 3.2 If directive present: `critical_count > 0` → exit 1, else exit 0. Log a one-line summary of all counters
-- [ ] 3.3 If directive absent and `critical_section_is_empty` says empty → exit 0 with `DEPRECATION: AI response did not include severity directive; falling back to prose parsing`
-- [ ] 3.4 If directive absent and prose parsing says non-empty → exit 1 (current behaviour)
-- [ ] 3.5 If directive says 0 but body contains `🔴 Critical Issues` header → log warning, trust the directive, exit 0
+- [x] 3.1 In `reviewer/main.py`, restructure the gatekeeper block: try `parse_severity_directive` first
+- [x] 3.2 If directive present: `critical_count > 0` → exit 1, else exit 0. Log a one-line summary of all counters
+- [x] 3.3 If directive absent and `critical_section_is_empty` says empty → exit 0 with `DEPRECATION: AI response did not include severity directive; falling back to prose parsing`
+- [x] 3.4 If directive absent and prose parsing says non-empty → exit 1 (current behaviour)
+- [x] 3.5 If directive says 0 but body contains `🔴 Critical Issues` header → log warning, trust the directive, exit 0
 
 ## 4. Tests
 
-- [ ] 4.1 Parametrized tests for the parser covering each valid form and each malformed form
-- [ ] 4.2 Tests for the gatekeeper logic: directive present + 0/non-zero, directive absent + fallback (each branch), conflicting directive + body
-- [ ] 4.3 Confirm existing `critical_section_is_empty` tests still pass (the function lives on as the fallback)
+- [x] 4.1 Parametrized tests for the parser covering each valid form and each malformed form
+- [x] 4.2 Tests for the gatekeeper logic: directive present + 0/non-zero, directive absent + fallback (each branch), conflicting directive + body
+- [x] 4.3 Confirm existing `critical_section_is_empty` tests still pass (the function lives on as the fallback)
 
 ## 5. Documentation
 
@@ -40,7 +40,7 @@
 
 ## 6. Verification
 
-- [ ] 6.1 `python -m pytest tests/ -v` passes from the repo root
+- [x] 6.1 `python -m pytest tests/ -v` passes from the repo root
 - [ ] 6.2 Manual run: synthesise a `mr_diff.txt`, run `python reviewer/main.py` with mocked AI client returning a directive-prefixed response, confirm gatekeeper exits 0
 - [ ] 6.3 Manual run: same setup with `critical=1` in the directive, confirm exit 1
 - [ ] 6.4 Manual run: response without directive but with negation body, confirm exit 0 + DEPRECATION log line
