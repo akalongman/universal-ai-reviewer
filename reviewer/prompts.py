@@ -6,7 +6,7 @@ import fnmatch
 from datetime import datetime
 
 
-MAX_DIFF_SIZE = 50000
+MAX_DIFF_SIZE = 200_000
 
 _NEGATION_WORDS = {"none", "no", "0", "n/a", "na", "nothing"}
 
@@ -179,7 +179,7 @@ def gatekeeper_exit_code(review_text):
         "to emit '<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->' "
         "as the first line. Prose parsing will be removed in 2.0."
     )
-    if "🔴 Critical Issues" in review_text and not critical_section_is_empty(review_text):
+    if _CRITICAL_HEADER_RE.search(review_text) and not critical_section_is_empty(review_text):
         print("[!] CRITICAL ISSUES DETECTED. Marking job as FAILED.")
         return 1
     print("[✓] No critical issues found. Marking job as PASSED.")

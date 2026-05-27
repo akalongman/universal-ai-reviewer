@@ -93,7 +93,7 @@ Default models (when `AI_MODEL` is unset) are hardcoded in `Config.__init__`: `c
 
 Three behaviours that are easy to break and worth understanding before editing:
 
-* **Diff truncation.** The diff is hard truncated at 50000 characters before being sent to the model (`MAX_DIFF_SIZE` in `build_prompts`). Test `test_build_prompts_truncates_massive_diffs` enforces this.
+* **Diff truncation.** The diff is hard truncated at `MAX_DIFF_SIZE` (200000 characters) before being sent to the model. This is a backstop; `check_context_window` is the authoritative limit and fails the run loudly when the assembled prompt would exceed the model's window. Test `test_build_prompts_truncates_massive_diffs` enforces the cap.
 * **`.aiignore` filtering.** `filter_diff` parses the unified diff, splits it on `diff --git` headers, and drops any file whose `b/` path matches a pattern from `.aiignore` via `fnmatch`. Patterns are matched both directly and as `*/{pattern}` so that bare names like `package-lock.json` match nested copies. There are no default ignore patterns: an absent or empty `.aiignore` means "review everything".
 * **`.ai-rules.md` injection.** If present in the repo being reviewed, its contents are injected verbatim into the user prompt under a `**Specific Project Rules:**` heading. Falls back to the `AI_PROJECT_CONTEXT` env var if the file is missing.
 
@@ -103,7 +103,7 @@ The current date is rendered into the system prompt via `datetime.now()` so the 
 
 ## When editing CI integration files
 
-* `action.yaml`: the `gemini_api_key` and `openai_api_key` inputs are referenced in the `env:` block but only `anthropic_api_key` and `gemini_api_key` are declared under `inputs:`. If you touch this file, declare every input that the env block references.
+* `action.yaml`: the `anthropic_api_key`, `gemini_api_key`, and `openai_api_key` inputs are each declared and wired into the `env:` block. Keep these in lockstep: any input referenced from `env:` must be declared under `inputs:`, and any newly declared input should be wired into `env:` if `main.py` needs to read it. An undeclared-but-referenced input silently passes nothing to the runner.
 * `gitlab-template.yml`: pins `python3 -m venv .venv` and re-clones this repo from `main` into `_shared_tools/`. Consumers typically pin a tag (e.g. `1.0.0`) when including the remote template, so version compatibility between the included template and the cloned code matters. Do not move shared logic between the two without considering this split.
 
 ## Repository hygiene

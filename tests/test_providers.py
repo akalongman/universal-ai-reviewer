@@ -4,6 +4,7 @@ from reviewer.llm_providers import (
     AnthropicReviewer,
     GeminiReviewer,
     OpenAIReviewer,
+    TruncatedResponseError,
     get_provider,
 )
 
@@ -151,3 +152,74 @@ def test_openai_reviewer_stream_parsing(mock_openai_class):
     assert call_kwargs['max_completion_tokens'] == 8192
     assert 'max_tokens' not in call_kwargs
     assert call_kwargs['stream'] is True
+
+
+# ---------- truncation detection ----------
+#
+# Each provider has its own sentinel for "stream ended because max_tokens was
+# hit." A truncated stream may include the directive but a half-written issues
+# section, which is unsafe to post. These tests guard the cross-SDK detection.
+
+
+@patch('reviewer.llm_providers.OpenAI')
+def test_openai_reviewer_raises_on_length_finish_reason(mock_openai_class):
+    """OpenAI signals max_tokens via finish_reason='length' on the final chunk."""
+    mock_client = MagicMock()
+    mock_openai_class.return_value = mock_client
+
+    chunk1 = MagicMock()
+    chunk1.choices = [MagicMock()]
+    chunk1.choices[0].delta.content = "partial review..."
+    chunk1.choices[0].finish_reason = None
+
+    final_chunk = MagicMock()
+    final_chunk.choices = [MagicMock()]
+    final_chunk.choices[0].delta.content = None
+    final_chunk.choices[0].finish_reason = "length"
+
+    mock_client.chat.completions.create.return_value = [chunk1, final_chunk]
+
+    config = MagicMock(model_name="gpt-4o", max_tokens=8192, temperature=0.2)
+    with pytest.raises(TruncatedResponseError) as exc_info:
+        OpenAIReviewer().review("sys", "user", "fake-key", config)
+    assert "AI_MAX_TOKENS" in str(exc_info.value)
+
+
+@patch('reviewer.llm_providers.Anthropic')
+def test_anthropic_reviewer_raises_on_max_tokens_stop_reason(mock_anthropic_class):
+    """Anthropic signals max_tokens via stop_reason='max_tokens' on the final message."""
+    mock_client = MagicMock()
+    mock_stream_context = MagicMock()
+    mock_stream_context.text_stream = ["partial review..."]
+    final_message = MagicMock()
+    final_message.stop_reason = "max_tokens"
+    mock_stream_context.get_final_message.return_value = final_message
+    mock_client.messages.stream.return_value.__enter__.return_value = mock_stream_context
+    mock_anthropic_class.return_value = mock_client
+
+    config = MagicMock(model_name="claude-sonnet-4-6", max_tokens=4096, temperature=0.2)
+    with pytest.raises(TruncatedResponseError) as exc_info:
+        AnthropicReviewer().review("sys", "user", "fake-key", config)
+    assert "AI_MAX_TOKENS" in str(exc_info.value)
+
+
+@patch('reviewer.llm_providers.genai.Client')
+def test_gemini_reviewer_raises_on_max_tokens_finish_reason(mock_genai_client_class):
+    """Gemini signals max_tokens via candidates[0].finish_reason being the
+    FinishReason.MAX_TOKENS enum (whose .name is 'MAX_TOKENS')."""
+    mock_client_instance = MagicMock()
+    mock_genai_client_class.return_value = mock_client_instance
+
+    fake_enum = MagicMock()
+    fake_enum.name = "MAX_TOKENS"
+
+    chunk = MagicMock()
+    chunk.text = "partial review..."
+    chunk.candidates = [MagicMock(finish_reason=fake_enum)]
+
+    mock_client_instance.models.generate_content_stream.return_value = [chunk]
+
+    config = MagicMock(model_name="gemini-2.5-pro", max_tokens=4096, temperature=0.2)
+    with pytest.raises(TruncatedResponseError) as exc_info:
+        GeminiReviewer().review("sys", "user", "fake-key", config)
+    assert "AI_MAX_TOKENS" in str(exc_info.value)
