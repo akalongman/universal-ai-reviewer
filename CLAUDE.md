@@ -26,6 +26,8 @@ For canonical detail, read the cited capability spec under `openspec/specs/<name
 | Topic | Spec | Rule summary |
 |---|---|---|
 | Full file context fetching | `context-fetching` | Opt in via `AI_FETCH_CHANGED_FULL` / `AI_FETCH_RELATED_FILES` / `AI_FETCH_RELATED_DEPTH`. Tree-sitter import extraction for JS, TS, and PHP only; other languages still get full content of changed files but skip related resolution. Repo-root `tsconfig.json` and `composer.json` only. Overflow fails loudly, no silent truncation. |
+| Severity directive in AI response | `prompt-engineering` | System prompt instructs the model to begin every response with `<!-- ai-review: critical=N; suggestions=N; nitpicks=N -->`. Parser accepts the prefix and keys case-insensitively and tolerates a leading markdown code fence. Category headers (`🔴`, `🟡`, `🟢`) stay in the prompt for human readability but are no longer the gatekeeper's signal source. |
+| CI gatekeeper decision | `pipeline-orchestration` | Directive-first: malformed directive fails closed; valid `critical>0` fails; `critical==0` passes (WARNING logged if body has a `🔴 Critical Issues` header). Directive absent falls back to `critical_section_is_empty` with a DEPRECATION log; fallback is removed in 2.0. Exit codes are 0 (pass) and 1 (fail). |
 
 ## Commands
 
